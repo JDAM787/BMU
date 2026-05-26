@@ -1,4 +1,4 @@
-﻿package com.example.bmu.modelos;
+package com.example.bmu.modelos;
 
 public class Personaje {
     protected int vidaActual;
@@ -17,7 +17,7 @@ public class Personaje {
         return esAferrable;
     }
 
-    public void recibirdaño(int cantidad) {
+    public void recibirDaño(int cantidad) {
         this.vidaActual -= cantidad;
         if (this.vidaActual < 0) {
             this.vidaActual = 0;
@@ -27,11 +27,15 @@ public class Personaje {
 
     public void atacar(Personaje objetivo) {
         System.out.println(this.getClass().getSimpleName() + " ataca a " + objetivo.getClass().getSimpleName() + " haciendo " + this.dañoBase + " de daño.");
-        objetivo.recibirdaño(this.dañoBase);
+        objetivo.recibirDaño(this.dañoBase);
     }
 
     public int getVidaActual() {
         return vidaActual;
+    }
+
+    public int getDañoBase() {
+        return dañoBase;
     }
 
     public boolean estaVivo() {

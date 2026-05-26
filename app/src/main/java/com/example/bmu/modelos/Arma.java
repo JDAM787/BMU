@@ -1,4 +1,4 @@
-﻿package com.example.bmu.modelos;
+package com.example.bmu.modelos;
 
 public class Arma {
     protected int dañoAdicional;
@@ -20,7 +20,7 @@ public class Arma {
         return durabilidad <= 0;
     }
 
-    public int getdañoAdicional() {
+    public int getDañoAdicional() {
         return estaRota() ? 0 : dañoAdicional;
     }
 }

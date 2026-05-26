@@ -1,4 +1,4 @@
-﻿package com.example.bmu.modelos;
+package com.example.bmu.modelos;
 
 public class TuboMetal extends Arma {
     public TuboMetal() {

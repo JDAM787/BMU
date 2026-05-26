@@ -1,4 +1,4 @@
-﻿package com.example.bmu.modelos;
+package com.example.bmu.modelos;
 
 public class Cuchillo extends Arma {
     public Cuchillo() {

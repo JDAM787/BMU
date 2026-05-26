@@ -1,4 +1,4 @@
-﻿package com.example.bmu.modelos;
+package com.example.bmu.modelos;
 
 public class Jugador extends Personaje {
     private Arma armaEquipada;
@@ -15,9 +15,9 @@ public class Jugador extends Personaje {
     @Override
     public void atacar(Personaje objetivo) {
         int dañoTotal = this.dañoBase;
-        
+
         if (armaEquipada != null && !armaEquipada.estaRota()) {
-            dañoTotal += armaEquipada.getdañoAdicional();
+            dañoTotal += armaEquipada.getDañoAdicional();
             System.out.println("Jugador ataca a " + objetivo.getClass().getSimpleName() + " usando " + armaEquipada.getClass().getSimpleName() + " haciendo " + dañoTotal + " de daño total.");
             armaEquipada.usarArma();
         } else {
@@ -26,7 +26,7 @@ public class Jugador extends Personaje {
                 System.out.println("(El arma está rota y no hace daño adicional)");
             }
         }
-        
-        objetivo.recibirdaño(dañoTotal);
+
+        objetivo.recibirDaño(dañoTotal);
     }
 }
