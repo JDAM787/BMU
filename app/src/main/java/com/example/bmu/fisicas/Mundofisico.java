@@ -38,8 +38,10 @@ public class MundoFisico {
         Body suelo = world.createBody(def);
 
         EdgeShape forma = new EdgeShape();
-        // Línea horizontal en Y=0 que abarca todo el escenario visible
-        forma.set(new Vector2(-100, 0), new Vector2(100, 0));
+        // Línea horizontal que representa la parte superior de la acera del escenario.
+        // Ajustar este valor hasta que el personaje quede parado ENCIMA de la acera visual.
+        float ySuelo = 3.5f;
+        forma.set(new Vector2(-100, ySuelo), new Vector2(100, ySuelo));
 
         FixtureDef fixture = new FixtureDef();
         fixture.shape  = forma;

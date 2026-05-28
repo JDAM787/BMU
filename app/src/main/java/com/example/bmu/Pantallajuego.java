@@ -14,6 +14,8 @@ import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.example.bmu.fisicas.*;
 import com.example.bmu.modelos.*;
 import com.example.bmu.ui.ControlesTouch;
+import com.example.bmu.mundo.GestorEscenarios;
+import com.example.bmu.vista.AnimadorHeroe;
 
 /**
  * Cómo añadir esta pantalla desde tu Game principal:
@@ -45,7 +47,18 @@ public class PantallaJuego implements Screen {
     private SpriteBatch        batch;
     private Texture            texturaTubo;
     private Texture            texturaCuchillo;
-    private Texture            texturaFondo;
+    private GestorEscenarios   gestorEscenarios;
+    private AnimadorHeroe      animadorHeroe;
+    private float              stateTime = 0f;
+    private boolean            mirandoDerecha = true;
+    // Estado de animación anterior para detectar cambios
+    private String             estadoAnimAnterior = "idle";
+    // Para detectar el momento exacto en que se presiona el botón de agarre (edge detection)
+    private boolean            agarrarAnteriorPresionado = false;
+    // Estado de ataque: bloquea otras animaciones mientras dura el golpe
+    private boolean            isAtacando = false;
+    private float              tiempoAtacando = 0f;        // cuánto llevas en el golpe
+    private boolean            estabaCorriendoAlGolpear = false; // qué fila del sheet usar
 
     @Override
     public void show() {
@@ -62,10 +75,11 @@ public class PantallaJuego implements Screen {
         EnemigoDebil  enD     = new EnemigoDebil();
         EnemigoFuerte enF     = new EnemigoFuerte();
 
-        // 4. Cuerpos Box2D (posiciones en píxeles, la fábrica convierte a metros)
-        Body cJugador = fabrica.crearCuerpoJugador( 200, 80, 40, 60, jugador);
-        Body cDebil   = fabrica.crearCuerpoEnemigo( 500, 80, 40, 60, true,  enD);
-        Body cFuerte  = fabrica.crearCuerpoEnemigo( 750, 80, 50, 70, false, enF);
+        // 4. Cuerpos Box2D (Aumentamos las cajas de colisión para que encajen con la nueva escala del sprite)
+        // spawn cerca del suelo físico (Y en píxeles; 3.5m * 64 PPM = 224 + mitad cuerpo ~80 = 304)
+        Body cJugador = fabrica.crearCuerpoJugador( 200, 304, 100, 160, jugador);
+        Body cDebil   = fabrica.crearCuerpoEnemigo( 500, 304, 100, 160, true,  enD);
+        Body cFuerte  = fabrica.crearCuerpoEnemigo( 750, 304, 120, 180, false, enF);
 
         // 5. Entidades físicas
         entJugador       = new EntidadFisica(cJugador, jugador);
@@ -88,9 +102,10 @@ public class PantallaJuego implements Screen {
         debugRenderer = new Box2DDebugRenderer();
         shapeRenderer = new ShapeRenderer();
         batch = new SpriteBatch();
-        texturaTubo = new Texture("tubo.png");
-        texturaCuchillo = new Texture("cuchillo.png");
-        texturaFondo = new Texture("escenario.png");
+        texturaTubo = new Texture("armas/tubo.png");
+        texturaCuchillo = new Texture("armas/cuchillo.png");
+        gestorEscenarios = new GestorEscenarios();
+        animadorHeroe = new AnimadorHeroe();
         camara = new OrthographicCamera();
         // Vista en metros para el debug renderer de Box2D
         camara.setToOrtho(false,
@@ -105,6 +120,7 @@ public class PantallaJuego implements Screen {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         // ── Leer controles táctiles ─────────────────────────────────────────
+        stateTime += delta;
         controles.actualizar();
         manejarEntradaTactil();
 
@@ -113,26 +129,105 @@ public class PantallaJuego implements Screen {
         escucha.procesarEventosPendientes(); // siempre DESPUÉS de world.step
 
         // ── Arrastrar enemigo agarrado con el jugador ───────────────────────
+        // Solo actualizamos la posición del ENEMIGO, nunca del jugador.
+        // El jugador se mueve libre; el enemigo lo sigue sin ejercer fuerza de vuelta.
         if (sistemaAgarre.tienEnemigoAgarrado()) {
-            entEnemigoDebil.getCuerpo().setTransform(
-                    entJugador.getCuerpo().getPosition().x + 0.5f,
-                    entJugador.getCuerpo().getPosition().y,
-                    0f
-            );
+            com.badlogic.gdx.math.Vector2 posJ = entJugador.getCuerpo().getPosition();
+            // Offset lateral: el enemigo va al lado del jugador mirando la dirección del héroe
+            float offsetX = mirandoDerecha ? 0.8f : -0.8f;
+            entEnemigoDebil.getCuerpo().setTransform(posJ.x + offsetX, posJ.y, 0f);
+            entEnemigoDebil.getCuerpo().setLinearVelocity(0, 0); // no agrega inercia al jugador
         }
 
-        // ── Debug render de Box2D ───────────────────────────────────────────
         camara.update();
-        debugRenderer.render(mundo.getWorld(), camara.combined);
+
 
         // ── Renderizado de Sprites ──────────────────────────────────────────
         batch.setProjectionMatrix(camara.combined);
         batch.begin();
         
-        // Dibujar el escenario de fondo
+        // Dibujar el escenario de fondo con el gestor
         float anchoPantallaM = Gdx.graphics.getWidth() / MundoFisico.PPM;
         float altoPantallaM = Gdx.graphics.getHeight() / MundoFisico.PPM;
-        batch.draw(texturaFondo, 0, 0, anchoPantallaM, altoPantallaM);
+        gestorEscenarios.dibujar(batch, anchoPantallaM, altoPantallaM);
+        
+        // Determinar qué animación usar según velocidad real + intensidad del joystick
+        float velX = entJugador.getCuerpo().getLinearVelocity().x;
+        float velY = entJugador.getCuerpo().getLinearVelocity().y;
+
+        // Duración total del golpe = 8 frames x 0.07s = 0.56s
+        final float DURACION_GOLPE = 8 * 0.07f;
+
+        // Actualizar temporizador de ataque
+        if (isAtacando) {
+            tiempoAtacando += delta;
+            if (tiempoAtacando >= DURACION_GOLPE) {
+                isAtacando = false;
+                tiempoAtacando = 0f;
+            }
+        }
+
+        String estadoAnim;
+        if (isAtacando) {
+            // Usar la fila correcta según si estaba corriendo o no cuando golpeó
+            estadoAnim = estabaCorriendoAlGolpear ? "punchRun" : "punch";
+        } else if (Math.abs(velY) > 0.5f && animadorHeroe.animFall != null) {
+            estadoAnim = "fall";
+        } else if (Math.abs(velX) > 3.5f && animadorHeroe.animRun != null) {
+            estadoAnim = "run";
+        } else if (Math.abs(velX) > 0.3f && animadorHeroe.animWalk != null) {
+            estadoAnim = "walk";
+        } else {
+            estadoAnim = "idle";
+        }
+
+        // Resetear el tiempo de animación cuando cambia el estado
+        if (!estadoAnim.equals(estadoAnimAnterior)) {
+            stateTime = 0f;
+            estadoAnimAnterior = estadoAnim;
+        }
+
+        com.badlogic.gdx.graphics.g2d.TextureRegion frameActual;
+        switch (estadoAnim) {
+            case "punch":    frameActual = animadorHeroe.animPunch.getKeyFrame(stateTime, false);    break;
+            case "punchRun": frameActual = animadorHeroe.animPunchRun.getKeyFrame(stateTime, false); break;
+            case "fall":     frameActual = animadorHeroe.animFall.getKeyFrame(stateTime, true);     break;
+            case "run":      frameActual = animadorHeroe.animRun.getKeyFrame(stateTime, true);      break;
+            case "walk":     frameActual = animadorHeroe.animWalk.getKeyFrame(stateTime, true);     break;
+            default:         frameActual = animadorHeroe.animIdle.getKeyFrame(stateTime, true);     break;
+        }
+
+        // Actualizar dirección solo si no está atacando
+        if (!isAtacando) {
+            if (controles.getDirX() > 0) mirandoDerecha = true;
+            if (controles.getDirX() < 0) mirandoDerecha = false;
+        }
+
+        float jugX = entJugador.getCuerpo().getPosition().x;
+        float jugY = entJugador.getCuerpo().getPosition().y;
+        
+        // La caja de colisión del jugador mide 160 de alto (radio 80).
+        float altoCuerpoM = 160f / MundoFisico.PPM;
+        
+        // Tamaño del sprite (Aumentado a 350 para compensar el espacio vacío alrededor del personaje en la imagen)
+        float anchoSpriteM = 350f / MundoFisico.PPM; 
+        float altoSpriteM = 350f / MundoFisico.PPM;
+        
+        // Ajuste fino (offset) para alinear los pies visuales del sprite con la línea física.
+        // Como tu imagen tiene espacio transparente debajo de los pies, bajamos el dibujo un poco.
+        float offsetY_M = -45f / MundoFisico.PPM; 
+        
+        // Dibujar al jugador y voltearlo si es necesario
+        if ((mirandoDerecha && frameActual.isFlipX()) || (!mirandoDerecha && !frameActual.isFlipX())) {
+            frameActual.flip(true, false);
+        }
+        
+        // Alinear la base de la imagen con la base de la caja de colisión, más el ajuste fino
+        float dibX = jugX - anchoSpriteM / 2f;
+        float dibY = jugY - (altoCuerpoM / 2f) + offsetY_M; 
+        
+        batch.draw(frameActual, dibX, dibY, anchoSpriteM, altoSpriteM);
+
         
         // Dibujar el tubo de metal atado a la física
         // El cuerpo del arma mide 30x10 px (según FabricaCuerpos).
@@ -166,22 +261,56 @@ public class PantallaJuego implements Screen {
                 )
         );
         controles.dibujar(shapeRenderer);
+        
+        // ── Debug render de Box2D (Dibuja las cajas de colisión y el suelo) ─────────
+        // Lo ponemos al final para que las líneas no queden tapadas por el fondo
+        camara.update();
+        debugRenderer.render(mundo.getWorld(), camara.combined);
     }
 
     // ── Lógica de entrada táctil ─────────────────────────────────────────────
 
     private void manejarEntradaTactil() {
-        // Movimiento horizontal con joystick
-        entJugador.mover(controles.getDirX());
+        float dirX = controles.getDirX();
+
+        // Bloquear retroceso: el jugador no puede pasar el borde izquierdo del escenario
+        float xJugadorMetros = entJugador.getCuerpo().getPosition().x;
+        float limiteIzquierdoMetros = 0.8f;
+        if (dirX < 0 && xJugadorMetros <= limiteIzquierdoMetros) {
+            dirX = 0;
+            entJugador.getCuerpo().setLinearVelocity(0, entJugador.getCuerpo().getLinearVelocity().y);
+        }
+
+        // Velocidad diferenciada: correr vs caminar según intensidad del joystick
+        if (Math.abs(dirX) > 0.001f) {
+            float vel = controles.isCorriendoRapido() ? 6f : 3f; // m/s
+            float signo = dirX > 0 ? 1f : -1f;
+            entJugador.getCuerpo().setLinearVelocity(
+                signo * vel,
+                entJugador.getCuerpo().getLinearVelocity().y
+            );
+        } else {
+            // Sin input de joystick: frenar horizontalmente
+            entJugador.getCuerpo().setLinearVelocity(
+                0,
+                entJugador.getCuerpo().getLinearVelocity().y
+            );
+        }
 
         // Salto
         if (controles.saltarPresionado) {
             entJugador.saltar();
         }
 
-        // Golpe normal
-        if (controles.golpePresionado) {
-            // Atacar al enemigo más cercano (simplificado: siempre al débil primero)
+        // Golpe (botón rojo): activar solo en el primer frame de la pulsación
+        if (controles.golpePresionado && !isAtacando) {
+            isAtacando = true;
+            tiempoAtacando = 0f;
+            stateTime = 0f; // reiniciar animación desde frame 0
+            // Guardar si estaba corriendo para elegir la fila correcta del sheet
+            float vx = entJugador.getCuerpo().getLinearVelocity().x;
+            estabaCorriendoAlGolpear = Math.abs(vx) > 3.5f;
+            // Aplicar daño al enemigo más cercano
             Jugador jug = (Jugador) entJugador.getModelo();
             Enemigo objetivo = enemigoMasCercano();
             if (objetivo != null) {
@@ -189,22 +318,38 @@ public class PantallaJuego implements Screen {
             }
         }
 
-        // Agarrar
-        if (controles.agarrarPresionado) {
-            sistemaAgarre.jugadorIntentaAgarrar(
-                    (Enemigo) entEnemigoDebil.getModelo(),
-                    entEnemigoDebil.getCuerpo()
-            );
+        // Agarrar: EDGE DETECTION — solo se ejecuta en el frame exacto que se presiona el botón
+        boolean agarrarAhora = controles.agarrarPresionado;
+        if (agarrarAhora && !agarrarAnteriorPresionado) {
+            // Primera pulsación: si ya tiene enemigo agarrado, lo suelta
+            if (sistemaAgarre.tienEnemigoAgarrado()) {
+                sistemaAgarre.soltarAgarre();
+            } else {
+                // Si no, intenta agarrar al enemigo más cercano
+                float distDebil  = Math.abs(xJugadorMetros - entEnemigoDebil.getCuerpo().getPosition().x);
+                float distFuerte = Math.abs(xJugadorMetros - entEnemigoFuerte.getCuerpo().getPosition().x);
+                float RANGO_AGARRE = 2.0f;
+                if (distDebil <= RANGO_AGARRE && entEnemigoDebil.getModelo().estaVivo()) {
+                    sistemaAgarre.jugadorIntentaAgarrar(
+                        (Enemigo) entEnemigoDebil.getModelo(),
+                        entEnemigoDebil.getCuerpo()
+                    );
+                } else if (distFuerte <= RANGO_AGARRE && entEnemigoFuerte.getModelo().estaVivo()) {
+                    sistemaAgarre.jugadorIntentaAgarrar(
+                        (Enemigo) entEnemigoFuerte.getModelo(),
+                        entEnemigoFuerte.getCuerpo()
+                    );
+                }
+            }
         }
+        agarrarAnteriorPresionado = agarrarAhora;
 
-        // Lanzar: dirección = la que lleva el joystick, o derecha por defecto
+        // Lanzar
         if (controles.lanzarPresionado) {
             int dir = controles.moviendoIzquierda() ? -1 : 1;
-
             if (sistemaAgarre.tienEnemigoAgarrado()) {
                 sistemaAgarre.lanzarEnemigo(dir);
             } else {
-                // Sin enemigo agarrado → lanza el arma
                 sistemaAgarre.lanzarArma(cuerpoArma, dir, 15f);
             }
         }
@@ -249,6 +394,7 @@ public class PantallaJuego implements Screen {
         batch.dispose();
         texturaTubo.dispose();
         texturaCuchillo.dispose();
-        texturaFondo.dispose();
+        gestorEscenarios.dispose();
+        animadorHeroe.dispose();
     }
 }
