@@ -18,9 +18,9 @@ public class ControlesTouch extends InputAdapter {
     
     // Botones
     private float btnGolpeX = Gdx.graphics.getWidth() - 300, btnGolpeY = 150, btnRadio = 60;
-    private float btnSaltoX = Gdx.graphics.getWidth() - 150, btnSaltoY = 150;
+    private float btnSaltoX = Gdx.graphics.getWidth() - 225, btnSaltoY = 50;
     private float btnAgarreX = Gdx.graphics.getWidth() - 225, btnAgarreY = 250;
-    private float btnLanzarX = Gdx.graphics.getWidth() - 225, btnLanzarY = 50;
+    private float btnLanzarX = Gdx.graphics.getWidth() - 150, btnLanzarY = 150;
     
     // Identificadores de los dedos
     private int punteroJoystick = -1;

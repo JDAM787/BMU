@@ -59,23 +59,53 @@ public class AnimadorHeroe {
     private Animation<TextureRegion> crearAnimacionFila(
             String ruta, int frameAncho, int frameAlto,
             int cols, int fila, float duracion) {
-        Texture sheet = new Texture("personajes/heroe/sprites-personaje/" + ruta);
-        texturasCargadas.add(sheet);
-        TextureRegion[][] grilla = TextureRegion.split(sheet, frameAncho, frameAlto);
-        Array<TextureRegion> frames = new Array<>();
-        for (int c = 0; c < cols; c++) {
-            frames.add(grilla[fila][c]);
+        TextureRegion[][] grilla = null;
+        try {
+            Texture sheet = new Texture("personajes/heroe/sprites-personaje/" + ruta);
+            texturasCargadas.add(sheet);
+            grilla = TextureRegion.split(sheet, frameAncho, frameAlto);
+        } catch (Exception e) {
+            System.out.println("No se pudo cargar sprite sheet: personajes/heroe/sprites-personaje/" + ruta + ". Usando fallback.");
         }
-        // NORMAL = se reproduce una sola vez, perfecto para golpes
+        
+        Array<TextureRegion> frames = new Array<>();
+        if (grilla != null && fila < grilla.length && cols <= grilla[fila].length) {
+            for (int c = 0; c < cols; c++) {
+                frames.add(grilla[fila][c]);
+            }
+        }
+        
+        if (frames.size == 0) {
+            com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+            pixmap.setColor(com.badlogic.gdx.graphics.Color.CLEAR);
+            pixmap.fill();
+            Texture tex = new Texture(pixmap);
+            texturasCargadas.add(tex);
+            frames.add(new TextureRegion(tex));
+            pixmap.dispose();
+        }
         return new Animation<>(duracion, frames, Animation.PlayMode.NORMAL);
     }
 
     private Animation<TextureRegion> crearAnimacion(float duracionFrame, String... rutasRelativas) {
         Array<TextureRegion> frames = new Array<>();
         for (String ruta : rutasRelativas) {
-            Texture tex = new Texture("personajes/heroe/sprites-personaje/" + ruta);
+            try {
+                Texture tex = new Texture("personajes/heroe/sprites-personaje/" + ruta);
+                texturasCargadas.add(tex);
+                frames.add(new TextureRegion(tex));
+            } catch (Exception e) {
+                System.out.println("No se pudo cargar: personajes/heroe/sprites-personaje/" + ruta + ". Saltando o usando fallback.");
+            }
+        }
+        if (frames.size == 0) {
+            com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+            pixmap.setColor(com.badlogic.gdx.graphics.Color.CLEAR);
+            pixmap.fill();
+            Texture tex = new Texture(pixmap);
             texturasCargadas.add(tex);
             frames.add(new TextureRegion(tex));
+            pixmap.dispose();
         }
         return new Animation<>(duracionFrame, frames, Animation.PlayMode.LOOP);
     }
@@ -84,9 +114,22 @@ public class AnimadorHeroe {
     private Animation<TextureRegion> crearAnimacionPingPong(float duracionFrame, String... rutasRelativas) {
         Array<TextureRegion> frames = new Array<>();
         for (String ruta : rutasRelativas) {
-            Texture tex = new Texture("personajes/heroe/sprites-personaje/" + ruta);
+            try {
+                Texture tex = new Texture("personajes/heroe/sprites-personaje/" + ruta);
+                texturasCargadas.add(tex);
+                frames.add(new TextureRegion(tex));
+            } catch (Exception e) {
+                System.out.println("No se pudo cargar: personajes/heroe/sprites-personaje/" + ruta);
+            }
+        }
+        if (frames.size == 0) {
+            com.badlogic.gdx.graphics.Pixmap pixmap = new com.badlogic.gdx.graphics.Pixmap(1, 1, com.badlogic.gdx.graphics.Pixmap.Format.RGBA8888);
+            pixmap.setColor(com.badlogic.gdx.graphics.Color.CLEAR);
+            pixmap.fill();
+            Texture tex = new Texture(pixmap);
             texturasCargadas.add(tex);
             frames.add(new TextureRegion(tex));
+            pixmap.dispose();
         }
         return new Animation<>(duracionFrame, frames, Animation.PlayMode.LOOP_PINGPONG);
     }

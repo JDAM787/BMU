@@ -66,10 +66,13 @@ public class SistemaAgarre {
         cuerpoAgarrado   = cuerpoEnemigo;
         tieneAgarre      = true;
 
-        // Mientras está agarrado, el enemigo no se mueve por físicas
+        // Mientras está agarrado, el enemigo no se mueve por físicas y es un sensor (evita daño por colisión/penetración)
         cuerpoEnemigo.setLinearVelocity(0, 0);
         cuerpoEnemigo.setAngularVelocity(0);
         cuerpoEnemigo.setGravityScale(0f); // Suspendido en el aire
+        for (com.badlogic.gdx.physics.box2d.Fixture f : cuerpoEnemigo.getFixtureList()) {
+            f.setSensor(true);
+        }
 
         System.out.println("[Agarre] Jugador agarra a "
                 + enemigo.getClass().getSimpleName() + ".");
@@ -89,6 +92,9 @@ public class SistemaAgarre {
 
         // Restaurar gravedad antes del impulso
         cuerpoAgarrado.setGravityScale(1f);
+        for (com.badlogic.gdx.physics.box2d.Fixture f : cuerpoAgarrado.getFixtureList()) {
+            f.setSensor(false);
+        }
 
         Vector2 impulso = new Vector2(
                 VEL_LANZAMIENTO_X * direccion,
@@ -112,6 +118,9 @@ public class SistemaAgarre {
     public void soltarAgarre() {
         if (cuerpoAgarrado != null) {
             cuerpoAgarrado.setGravityScale(1f);
+            for (com.badlogic.gdx.physics.box2d.Fixture f : cuerpoAgarrado.getFixtureList()) {
+                f.setSensor(false);
+            }
         }
         enemigoAgarrado = null;
         cuerpoAgarrado  = null;
@@ -159,6 +168,10 @@ public class SistemaAgarre {
 
     public Enemigo getEnemigoAgarrado() {
         return enemigoAgarrado;
+    }
+
+    public Body getCuerpoAgarrado() {
+        return cuerpoAgarrado;
     }
 
     // ── Helper privado ───────────────────────────────────────────────────────

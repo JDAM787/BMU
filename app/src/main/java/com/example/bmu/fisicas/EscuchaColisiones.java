@@ -128,14 +128,15 @@ public class EscuchaColisiones implements ContactListener {
     }
 
     private void manejarCaida(Personaje personaje, Body cuerpo) {
-        float velocidadCaida = Math.abs(cuerpo.getLinearVelocity().y);
-        // Solo aplica daño si la velocidad de caída es significativa
-        if (velocidadCaida > 3f) {
-            int daño = (int) (velocidadCaida * DAÑO_CAIDA / 5f);
+        float velocidadCaida = cuerpo.getLinearVelocity().y;
+        // Solo aplica daño si la velocidad de caída es significativa hacia abajo (negativa)
+        if (velocidadCaida < -3f) {
+            float velAbs = Math.abs(velocidadCaida);
+            int daño = (int) (velAbs * DAÑO_CAIDA / 5f);
             personaje.recibirDaño(daño);
             System.out.println("[Caída] " + personaje.getClass().getSimpleName()
                     + " golpea el suelo → " + daño + " de daño (vel: "
-                    + String.format("%.1f", velocidadCaida) + " m/s).");
+                    + String.format("%.1f", velAbs) + " m/s).");
         }
     }
 

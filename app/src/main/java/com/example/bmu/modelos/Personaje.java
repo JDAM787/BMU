@@ -6,6 +6,8 @@ public class Personaje {
     protected int dañoBase;
     protected boolean esAferrable; // Propiedad para saber si se puede agarrar/lanzar
 
+    public float tiempoHurt = 0f;
+
     public Personaje(int vidaMaxima, int dañoBase) {
         this.vidaMaxima = vidaMaxima;
         this.vidaActual = vidaMaxima;
@@ -22,7 +24,14 @@ public class Personaje {
         if (this.vidaActual < 0) {
             this.vidaActual = 0;
         }
+        this.tiempoHurt = 0.5f; // Duración de la animación de recibir daño
         System.out.println(this.getClass().getSimpleName() + " recibe " + cantidad + " de daño. Vida restante: " + this.vidaActual);
+    }
+
+    public void actualizar(float delta) {
+        if (tiempoHurt > 0) {
+            tiempoHurt -= delta;
+        }
     }
 
     public void atacar(Personaje objetivo) {

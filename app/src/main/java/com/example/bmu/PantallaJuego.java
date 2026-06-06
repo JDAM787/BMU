@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
@@ -16,6 +17,7 @@ import com.example.bmu.modelos.*;
 import com.example.bmu.ui.ControlesTouch;
 import com.example.bmu.mundo.GestorEscenarios;
 import com.example.bmu.vista.AnimadorHeroe;
+import com.example.bmu.vista.AnimadorEnemigoDebil;
 
 /**
  * Cómo añadir esta pantalla desde tu Game principal:
@@ -49,16 +51,26 @@ public class PantallaJuego implements Screen {
     private Texture            texturaCuchillo;
     private GestorEscenarios   gestorEscenarios;
     private AnimadorHeroe      animadorHeroe;
+    private AnimadorEnemigoDebil animadorEnemigoDebil;
     private float              stateTime = 0f;
     private boolean            mirandoDerecha = true;
     // Estado de animación anterior para detectar cambios
     private String             estadoAnimAnterior = "idle";
     // Para detectar el momento exacto en que se presiona el botón de agarre (edge detection)
     private boolean            agarrarAnteriorPresionado = false;
+    // Para detectar el momento exacto en que se presiona el botón de lanzar (edge detection)
+    private boolean            lanzarAnteriorPresionado = false;
     // Estado de ataque: bloquea otras animaciones mientras dura el golpe
     private boolean            isAtacando = false;
     private float              tiempoAtacando = 0f;        // cuánto llevas en el golpe
     private boolean            estabaCorriendoAlGolpear = false; // qué fila del sheet usar
+
+    // Estados para EnemigoDebil
+    private float stateTimeDebil = 0f;
+    private float cooldownAtaqueDebil = 0f;
+    private float tiempoAtacandoDebil = 0f;
+    private boolean isAtacandoDebil = false;
+    private float tiempoEnSueloMuerto = 0f;
 
     @Override
     public void show() {
@@ -106,6 +118,7 @@ public class PantallaJuego implements Screen {
         texturaCuchillo = new Texture("armas/cuchillo.png");
         gestorEscenarios = new GestorEscenarios();
         animadorHeroe = new AnimadorHeroe();
+        animadorEnemigoDebil = new AnimadorEnemigoDebil(1);
         camara = new OrthographicCamera();
         // Vista en metros para el debug renderer de Box2D
         camara.setToOrtho(false,
@@ -124,6 +137,9 @@ public class PantallaJuego implements Screen {
         controles.actualizar();
         manejarEntradaTactil();
 
+        // ── Actualizar Modelos e IA de Enemigos ─────────────────────────────
+        actualizarEnemigos(delta);
+
         // ── Paso de física ──────────────────────────────────────────────────
         mundo.actualizar(delta);
         escucha.procesarEventosPendientes(); // siempre DESPUÉS de world.step
@@ -135,8 +151,11 @@ public class PantallaJuego implements Screen {
             com.badlogic.gdx.math.Vector2 posJ = entJugador.getCuerpo().getPosition();
             // Offset lateral: el enemigo va al lado del jugador mirando la dirección del héroe
             float offsetX = mirandoDerecha ? 0.8f : -0.8f;
-            entEnemigoDebil.getCuerpo().setTransform(posJ.x + offsetX, posJ.y, 0f);
-            entEnemigoDebil.getCuerpo().setLinearVelocity(0, 0); // no agrega inercia al jugador
+            Body cAgarrado = sistemaAgarre.getCuerpoAgarrado();
+            if (cAgarrado != null) {
+                cAgarrado.setTransform(posJ.x + offsetX, posJ.y, 0f);
+                cAgarrado.setLinearVelocity(0, 0); // no agrega inercia al jugador
+            }
         }
 
         camara.update();
@@ -188,13 +207,32 @@ public class PantallaJuego implements Screen {
         }
 
         com.badlogic.gdx.graphics.g2d.TextureRegion frameActual;
+        com.badlogic.gdx.graphics.g2d.TextureRegion primerFrame;
         switch (estadoAnim) {
-            case "punch":    frameActual = animadorHeroe.animPunch.getKeyFrame(stateTime, false);    break;
-            case "punchRun": frameActual = animadorHeroe.animPunchRun.getKeyFrame(stateTime, false); break;
-            case "fall":     frameActual = animadorHeroe.animFall.getKeyFrame(stateTime, true);     break;
-            case "run":      frameActual = animadorHeroe.animRun.getKeyFrame(stateTime, true);      break;
-            case "walk":     frameActual = animadorHeroe.animWalk.getKeyFrame(stateTime, true);     break;
-            default:         frameActual = animadorHeroe.animIdle.getKeyFrame(stateTime, true);     break;
+            case "punch":
+                frameActual = animadorHeroe.animPunch.getKeyFrame(stateTime, false);
+                primerFrame = animadorHeroe.animPunch.getKeyFrame(0f);
+                break;
+            case "punchRun":
+                frameActual = animadorHeroe.animPunchRun.getKeyFrame(stateTime, false);
+                primerFrame = animadorHeroe.animPunchRun.getKeyFrame(0f);
+                break;
+            case "fall":
+                frameActual = animadorHeroe.animFall.getKeyFrame(stateTime, true);
+                primerFrame = animadorHeroe.animFall.getKeyFrame(0f);
+                break;
+            case "run":
+                frameActual = animadorHeroe.animRun.getKeyFrame(stateTime, true);
+                primerFrame = animadorHeroe.animRun.getKeyFrame(0f);
+                break;
+            case "walk":
+                frameActual = animadorHeroe.animWalk.getKeyFrame(stateTime, true);
+                primerFrame = animadorHeroe.animWalk.getKeyFrame(0f);
+                break;
+            default:
+                frameActual = animadorHeroe.animIdle.getKeyFrame(stateTime, true);
+                primerFrame = animadorHeroe.animIdle.getKeyFrame(0f);
+                break;
         }
 
         // Actualizar dirección solo si no está atacando
@@ -209,25 +247,30 @@ public class PantallaJuego implements Screen {
         // La caja de colisión del jugador mide 160 de alto (radio 80).
         float altoCuerpoM = 160f / MundoFisico.PPM;
         
-        // Tamaño del sprite (Aumentado a 350 para compensar el espacio vacío alrededor del personaje en la imagen)
-        float anchoSpriteM = 350f / MundoFisico.PPM; 
+        // Tamaño del sprite basado en su proporción original para evitar deformación
+        // Usamos el primer frame de la animación como base para el aspect ratio para evitar deformación horizontal dinámica (wobble)
         float altoSpriteM = 350f / MundoFisico.PPM;
+        float aspect = (float) primerFrame.getRegionWidth() / primerFrame.getRegionHeight();
+        float anchoSpriteM = altoSpriteM * aspect;
         
         // Ajuste fino (offset) para alinear los pies visuales del sprite con la línea física.
         // Como tu imagen tiene espacio transparente debajo de los pies, bajamos el dibujo un poco.
         float offsetY_M = -45f / MundoFisico.PPM; 
         
-        // Dibujar al jugador y voltearlo si es necesario
-        if ((mirandoDerecha && frameActual.isFlipX()) || (!mirandoDerecha && !frameActual.isFlipX())) {
-            frameActual.flip(true, false);
+        // Clonar la región de textura para evitar modificar permanentemente el frame compartido
+        TextureRegion drawFrame = new TextureRegion(frameActual);
+        if (!mirandoDerecha) {
+            drawFrame.flip(true, false);
         }
         
         // Alinear la base de la imagen con la base de la caja de colisión, más el ajuste fino
         float dibX = jugX - anchoSpriteM / 2f;
         float dibY = jugY - (altoCuerpoM / 2f) + offsetY_M; 
         
-        batch.draw(frameActual, dibX, dibY, anchoSpriteM, altoSpriteM);
+        batch.draw(drawFrame, dibX, dibY, anchoSpriteM, altoSpriteM);
 
+        // Dibujar Enemigo Debil
+        dibujarEnemigoDebil(batch, entEnemigoDebil, animadorEnemigoDebil, stateTimeDebil, isAtacandoDebil);
         
         // Dibujar el tubo de metal atado a la física
         // El cuerpo del arma mide 30x10 px (según FabricaCuerpos).
@@ -314,7 +357,22 @@ public class PantallaJuego implements Screen {
             Jugador jug = (Jugador) entJugador.getModelo();
             Enemigo objetivo = enemigoMasCercano();
             if (objetivo != null) {
+                boolean estabaVivoAntes = objetivo.estaVivo();
                 jug.atacar(objetivo);
+                
+                // Si el enemigo muere por este golpe, aplicar empuje hacia atrás
+                if (estabaVivoAntes && !objetivo.estaVivo()) {
+                    float dirEmpuje = mirandoDerecha ? 5f : -5f;
+                    Body cEnemigo = null;
+                    if (entEnemigoDebil != null && objetivo == entEnemigoDebil.getModelo()) {
+                        cEnemigo = entEnemigoDebil.getCuerpo();
+                    } else if (entEnemigoFuerte != null && objetivo == entEnemigoFuerte.getModelo()) {
+                        cEnemigo = entEnemigoFuerte.getCuerpo();
+                    }
+                    if (cEnemigo != null) {
+                        cEnemigo.setLinearVelocity(dirEmpuje, 4f);
+                    }
+                }
             }
         }
 
@@ -326,26 +384,32 @@ public class PantallaJuego implements Screen {
                 sistemaAgarre.soltarAgarre();
             } else {
                 // Si no, intenta agarrar al enemigo más cercano
-                float distDebil  = Math.abs(xJugadorMetros - entEnemigoDebil.getCuerpo().getPosition().x);
-                float distFuerte = Math.abs(xJugadorMetros - entEnemigoFuerte.getCuerpo().getPosition().x);
                 float RANGO_AGARRE = 2.0f;
-                if (distDebil <= RANGO_AGARRE && entEnemigoDebil.getModelo().estaVivo()) {
+                EntidadFisica masCercano = null;
+                float minDist = Float.MAX_VALUE;
+                
+                if (entEnemigoDebil != null && entEnemigoDebil.getModelo().estaVivo()) {
+                    float d = Math.abs(xJugadorMetros - entEnemigoDebil.getCuerpo().getPosition().x);
+                    if (d < minDist) { minDist = d; masCercano = entEnemigoDebil; }
+                }
+                if (entEnemigoFuerte.getModelo().estaVivo()) {
+                    float d = Math.abs(xJugadorMetros - entEnemigoFuerte.getCuerpo().getPosition().x);
+                    if (d < minDist) { minDist = d; masCercano = entEnemigoFuerte; }
+                }
+                
+                if (masCercano != null && minDist <= RANGO_AGARRE) {
                     sistemaAgarre.jugadorIntentaAgarrar(
-                        (Enemigo) entEnemigoDebil.getModelo(),
-                        entEnemigoDebil.getCuerpo()
-                    );
-                } else if (distFuerte <= RANGO_AGARRE && entEnemigoFuerte.getModelo().estaVivo()) {
-                    sistemaAgarre.jugadorIntentaAgarrar(
-                        (Enemigo) entEnemigoFuerte.getModelo(),
-                        entEnemigoFuerte.getCuerpo()
+                        (Enemigo) masCercano.getModelo(),
+                        masCercano.getCuerpo()
                     );
                 }
             }
         }
         agarrarAnteriorPresionado = agarrarAhora;
 
-        // Lanzar
-        if (controles.lanzarPresionado) {
+        // Lanzar: EDGE DETECTION
+        boolean lanzarAhora = controles.lanzarPresionado;
+        if (lanzarAhora && !lanzarAnteriorPresionado) {
             int dir = controles.moviendoIzquierda() ? -1 : 1;
             if (sistemaAgarre.tienEnemigoAgarrado()) {
                 sistemaAgarre.lanzarEnemigo(dir);
@@ -353,26 +417,30 @@ public class PantallaJuego implements Screen {
                 sistemaAgarre.lanzarArma(cuerpoArma, dir, 15f);
             }
         }
+        lanzarAnteriorPresionado = lanzarAhora;
     }
 
     /** Devuelve el enemigo vivo más cercano al jugador (para recibir golpes). */
     private Enemigo enemigoMasCercano() {
-        float xJ  = entJugador.getCuerpo().getPosition().x;
-        float xD  = entEnemigoDebil.getCuerpo().getPosition().x;
-        float xF  = entEnemigoFuerte.getCuerpo().getPosition().x;
+        float xJ = entJugador.getCuerpo().getPosition().x;
+        float minDist = Float.MAX_VALUE;
+        Enemigo masCercano = null;
 
-        boolean debilVivo  = entEnemigoDebil.getModelo().estaVivo();
-        boolean fuerteVivo = entEnemigoFuerte.getModelo().estaVivo();
-
-        if (!debilVivo && !fuerteVivo) return null;
-        if (!debilVivo)  return (Enemigo) entEnemigoFuerte.getModelo();
-        if (!fuerteVivo) return (Enemigo) entEnemigoDebil.getModelo();
-
-        float distD = Math.abs(xJ - xD);
-        float distF = Math.abs(xJ - xF);
-        return distD <= distF
-                ? (Enemigo) entEnemigoDebil.getModelo()
-                : (Enemigo) entEnemigoFuerte.getModelo();
+        if (entEnemigoDebil != null && entEnemigoDebil.getModelo().estaVivo()) {
+            float d = Math.abs(xJ - entEnemigoDebil.getCuerpo().getPosition().x);
+            if (d < minDist) {
+                minDist = d;
+                masCercano = (Enemigo) entEnemigoDebil.getModelo();
+            }
+        }
+        if (entEnemigoFuerte.getModelo().estaVivo()) {
+            float d = Math.abs(xJ - entEnemigoFuerte.getCuerpo().getPosition().x);
+            if (d < minDist) {
+                minDist = d;
+                masCercano = (Enemigo) entEnemigoFuerte.getModelo();
+            }
+        }
+        return masCercano;
     }
 
     // ── Ciclo de vida de Screen ───────────────────────────────────────────────
@@ -396,5 +464,146 @@ public class PantallaJuego implements Screen {
         texturaCuchillo.dispose();
         gestorEscenarios.dispose();
         animadorHeroe.dispose();
+        if (animadorEnemigoDebil != null) animadorEnemigoDebil.dispose();
+    }
+
+    private void actualizarEnemigos(float delta) {
+        entJugador.getModelo().actualizar(delta);
+        
+        if (entEnemigoDebil != null) {
+            entEnemigoDebil.getModelo().actualizar(delta);
+            actualizarIA(delta, entEnemigoDebil);
+            
+            // Si está muerto, iniciar temporizador de desaparición de manera robusta (sin depender de estaEnSuelo para evitar vibraciones)
+            if (!entEnemigoDebil.getModelo().estaVivo()) {
+                tiempoEnSueloMuerto += delta;
+                if (tiempoEnSueloMuerto >= 3.0f) {
+                    if (sistemaAgarre.getEnemigoAgarrado() == entEnemigoDebil.getModelo()) {
+                        sistemaAgarre.soltarAgarre();
+                    }
+                    mundo.getWorld().destroyBody(entEnemigoDebil.getCuerpo());
+                    entEnemigoDebil = null;
+                }
+            }
+        }
+    }
+    
+    private void actualizarIA(float delta, EntidadFisica enemigo) {
+        if (!enemigo.getModelo().estaVivo()) {
+            if (enemigo.estaEnSuelo()) {
+                enemigo.detener();
+            }
+            return;
+        }
+
+        // Si está agarrado por el jugador, no hace nada
+        if (sistemaAgarre.tienEnemigoAgarrado() && sistemaAgarre.getEnemigoAgarrado() == enemigo.getModelo()) {
+            return;
+        }
+
+        // Actualizar cooldown y tiempo de ataque
+        stateTimeDebil += delta;
+        if (cooldownAtaqueDebil > 0) cooldownAtaqueDebil -= delta;
+        if (isAtacandoDebil) {
+            tiempoAtacandoDebil += delta;
+            if (tiempoAtacandoDebil >= 0.3f) {
+                isAtacandoDebil = false;
+                tiempoAtacandoDebil = 0f;
+            }
+        }
+
+        // Si está herido o atacando, detener físicas horizontales
+        if (enemigo.getModelo().tiempoHurt > 0 || isAtacandoDebil) {
+            enemigo.detener();
+            return;
+        }
+
+        float xJ = entJugador.getCuerpo().getPosition().x;
+        float xE = enemigo.getCuerpo().getPosition().x;
+        float dx = xJ - xE;
+
+        if (Math.abs(dx) > 1.2f) {
+            // Moverse hacia el jugador
+            float dir = Math.signum(dx);
+            enemigo.mover(dir * 0.5f); // 0.5f es la velocidad/dirección reducida
+        } else {
+            enemigo.detener();
+            // Atacar si el jugador está vivo y no hay cooldown
+            if (entJugador.getModelo().estaVivo() && cooldownAtaqueDebil <= 0) {
+                isAtacandoDebil = true;
+                tiempoAtacandoDebil = 0f;
+                stateTimeDebil = 0f;
+                cooldownAtaqueDebil = 1.5f;
+                enemigo.getModelo().atacar(entJugador.getModelo());
+            }
+        }
+    }
+
+    private void dibujarEnemigoDebil(SpriteBatch batch, EntidadFisica enemigo, AnimadorEnemigoDebil animador, float stateTime, boolean isAtacando) {
+        if (enemigo == null) return;
+
+        // Parpadeo antes de desaparecer (entre 1.5s y 3.0s de estar muerto)
+        if (!enemigo.getModelo().estaVivo() && tiempoEnSueloMuerto > 1.5f) {
+            boolean mostrar = ((int)((tiempoEnSueloMuerto - 1.5f) * 15)) % 2 == 0;
+            if (!mostrar) return; // Se salta el dibujado en este frame para lograr el parpadeo
+        }
+        
+        float enX = enemigo.getCuerpo().getPosition().x;
+        float enY = enemigo.getCuerpo().getPosition().y;
+        
+        float altoCuerpoM = 160f / MundoFisico.PPM;
+        float altoSpriteM = 350f / MundoFisico.PPM;
+        float offsetY_M = -45f / MundoFisico.PPM;
+
+        TextureRegion frameActual;
+        TextureRegion primerFrame;
+        
+        if (!enemigo.getModelo().estaVivo()) {
+            // Si está muerto y lleva menos de 1.0s o no está en el suelo, usar animación de caída
+            if (tiempoEnSueloMuerto < 1.0f && !enemigo.estaEnSuelo()) {
+                frameActual = animador.animFall.getKeyFrame(stateTime, false);
+                primerFrame = animador.animFall.getKeyFrame(0f);
+            } else {
+                frameActual = animador.animDead.getKeyFrame(stateTime, false);
+                primerFrame = animador.animDead.getKeyFrame(0f);
+            }
+        } else if (enemigo.getModelo().tiempoHurt > 0) {
+            frameActual = animador.animHurt.getKeyFrame(enemigo.getModelo().tiempoHurt, false);
+            primerFrame = animador.animHurt.getKeyFrame(0f);
+        } else if (isAtacando) {
+            frameActual = animador.animPunch.getKeyFrame(stateTime, false);
+            primerFrame = animador.animPunch.getKeyFrame(0f);
+        } else if (Math.abs(enemigo.getCuerpo().getLinearVelocity().x) > 0.3f) {
+            frameActual = animador.animWalk.getKeyFrame(stateTime, true);
+            primerFrame = animador.animWalk.getKeyFrame(0f);
+        } else {
+            frameActual = animador.animIdle.getKeyFrame(stateTime, true);
+            primerFrame = animador.animIdle.getKeyFrame(0f);
+        }
+
+        // Mantener proporción original para evitar deformación usando primerFrame para el aspect ratio
+        float aspect = (float) primerFrame.getRegionWidth() / primerFrame.getRegionHeight();
+        float anchoSpriteM = altoSpriteM * aspect;
+
+        // Determinar dirección de mirada
+        boolean mirandoDerechaEnemigo = true;
+        // Si se está moviendo, usa la dirección de movimiento
+        if (Math.abs(enemigo.getCuerpo().getLinearVelocity().x) > 0.1f) {
+            mirandoDerechaEnemigo = enemigo.getCuerpo().getLinearVelocity().x > 0;
+        } else {
+            // Si no se mueve, mira hacia el jugador
+            mirandoDerechaEnemigo = entJugador.getCuerpo().getPosition().x > enX;
+        }
+
+        // Clonar la región de textura para evitar modificar permanentemente el frame compartido
+        TextureRegion drawFrame = new TextureRegion(frameActual);
+        if (!mirandoDerechaEnemigo) {
+            drawFrame.flip(true, false);
+        }
+
+        float dibX = enX - anchoSpriteM / 2f;
+        float dibY = enY - (altoCuerpoM / 2f) + offsetY_M;
+
+        batch.draw(drawFrame, dibX, dibY, anchoSpriteM, altoSpriteM);
     }
 }
