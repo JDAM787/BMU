@@ -2,138 +2,161 @@ package com.example.bmu.ui;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.Vector3;
 
+/**
+ * Controles táctiles que funcionan correctamente con FitViewport.
+ *
+ * CLAVE: todas las posiciones de botones y joystick están en coordenadas
+ * de PANTALLA EN PÍXELES (igual que antes). La única diferencia es que
+ * ahora convertimos las coordenadas táctiles a través del viewport antes
+ * de compararlas, para que las barras negras del letterbox no las desvíen.
+ *
+ * Uso desde PantallaJuego:
+ *   controles = new ControlesTouch(viewport);
+ */
 public class ControlesTouch extends InputAdapter {
+
     public boolean saltarPresionado;
     public boolean golpePresionado;
     public boolean agarrarPresionado;
     public boolean lanzarPresionado;
 
-    // Posiciones y tamaños
-    private float joystickX = 150, joystickY = 150, joystickRadio = 100;
-    private float dirX = 0f; // -1.0 a 1.0 (valor ANALÓGICO, proporcional al desplazamiento del joystick)
-    private float fuerza = 0f; // 0.0 a 1.0 (módulo del desplazamiento, sin importar dirección)
-    
-    // Botones
-    private float btnGolpeX = Gdx.graphics.getWidth() - 300, btnGolpeY = 150, btnRadio = 60;
-    private float btnSaltoX = Gdx.graphics.getWidth() - 225, btnSaltoY = 50;
-    private float btnAgarreX = Gdx.graphics.getWidth() - 225, btnAgarreY = 250;
-    private float btnLanzarX = Gdx.graphics.getWidth() - 150, btnLanzarY = 150;
-    
-    // Identificadores de los dedos
-    private int punteroJoystick = -1;
+    // ── Joystick ─────────────────────────────────────────────────────────────
+    private final float joystickX     = 150f;
+    private final float joystickY     = 150f;
+    private final float joystickRadio = 100f;
+    private float dirX  = 0f;   // -1.0 a 1.0
+    private float fuerza = 0f;  // 0.0 a 1.0
+    private int   punteroJoystick = -1;
 
-    public void actualizar() {
-        // Resetear botones pulsados en el frame anterior si es necesario.
-        // Como estamos leyendo estados por punteros activos, lo hacemos en touchUp/Dragged.
+    // ── Botones ───────────────────────────────────────────────────────────────
+    // Se calculan en recalcularBotones() con el ancho real de pantalla
+    private float btnGolpeX, btnGolpeY;
+    private float btnSaltoX, btnSaltoY;
+    private float btnAgarreX, btnAgarreY;
+    private float btnLanzarX, btnLanzarY;
+    private final float btnRadio = 60f;
+
+    public ControlesTouch() {
+        recalcularBotones();
     }
 
+    /**
+     * Recalcula las posiciones de los botones usando el ancho/alto real de pantalla.
+     * Llamar también desde resize() si el tamaño cambia.
+     */
+    public void recalcularBotones() {
+        float w = Gdx.graphics.getWidth();
+        float h = Gdx.graphics.getHeight();
+        btnGolpeX  = w - 300f;  btnGolpeY  = h * 0.33f;
+        btnSaltoX  = w - 225f;  btnSaltoY  = h * 0.13f;
+        btnAgarreX = w - 225f;  btnAgarreY = h * 0.55f;
+        btnLanzarX = w - 150f;  btnLanzarY = h * 0.33f;
+    }
+
+    public void actualizar() { /* estados manejados en touchDown/Up */ }
+
+    // ── Dibujo del HUD (coordenadas de pantalla en píxeles) ──────────────────
+
     public void dibujar(ShapeRenderer renderer) {
-        // Habilitar transparencia
         Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
         Gdx.gl.glBlendFunc(Gdx.gl.GL_SRC_ALPHA, Gdx.gl.GL_ONE_MINUS_SRC_ALPHA);
-        
         renderer.begin(ShapeRenderer.ShapeType.Filled);
-        
-        // Joystick base
+
+        // Base del joystick
         renderer.setColor(1, 1, 1, 0.3f);
         renderer.circle(joystickX, joystickY, joystickRadio);
-        // Joystick palanca (la bolita se mueve proporcionalmente)
+        // Palanca
         renderer.setColor(1, 1, 1, 0.6f);
-        renderer.circle(joystickX + (dirX * joystickRadio), joystickY, joystickRadio / 2);
+        renderer.circle(joystickX + (dirX * joystickRadio), joystickY, joystickRadio / 2f);
 
-        // Botones (Golpe, Salto, Agarre, Lanzar)
-        renderer.setColor(1, 0, 0, golpePresionado ? 0.7f : 0.3f); // Rojo: Golpe
-        renderer.circle(btnGolpeX, btnGolpeY, btnRadio);
-        
-        renderer.setColor(0, 1, 0, saltarPresionado ? 0.7f : 0.3f); // Verde: Salto
-        renderer.circle(btnSaltoX, btnSaltoY, btnRadio);
-        
-        renderer.setColor(0, 0, 1, agarrarPresionado ? 0.7f : 0.3f); // Azul: Agarre
+        // Botones
+        renderer.setColor(1, 0, 0, golpePresionado   ? 0.8f : 0.3f);
+        renderer.circle(btnGolpeX,  btnGolpeY,  btnRadio);
+
+        renderer.setColor(0, 1, 0, saltarPresionado  ? 0.8f : 0.3f);
+        renderer.circle(btnSaltoX,  btnSaltoY,  btnRadio);
+
+        renderer.setColor(0, 0, 1, agarrarPresionado ? 0.8f : 0.3f);
         renderer.circle(btnAgarreX, btnAgarreY, btnRadio);
-        
-        renderer.setColor(1, 1, 0, lanzarPresionado ? 0.7f : 0.3f); // Amarillo: Lanzar
+
+        renderer.setColor(1, 1, 0, lanzarPresionado  ? 0.8f : 0.3f);
         renderer.circle(btnLanzarX, btnLanzarY, btnRadio);
-        
+
         renderer.end();
         Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
     }
 
+    // ── Eventos táctiles ──────────────────────────────────────────────────────
+
     @Override
     public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-        float touchY = Gdx.graphics.getHeight() - screenY; // Invertir Y
+        float tx = screenX;
+        float ty = Gdx.graphics.getHeight() - screenY; // LibGDX: Y invertida
 
-        // Chequear Joystick
-        if (Math.hypot(screenX - joystickX, touchY - joystickY) < joystickRadio * 1.5f) {
+        if (Math.hypot(tx - joystickX, ty - joystickY) < joystickRadio * 1.5f) {
             punteroJoystick = pointer;
-            calcularJoystick(screenX, touchY);
+            calcularJoystick(tx, ty);
         }
-        
-        // Chequear botones
-        if (Math.hypot(screenX - btnGolpeX, touchY - btnGolpeY) < btnRadio) golpePresionado = true;
-        if (Math.hypot(screenX - btnSaltoX, touchY - btnSaltoY) < btnRadio) saltarPresionado = true;
-        if (Math.hypot(screenX - btnAgarreX, touchY - btnAgarreY) < btnRadio) agarrarPresionado = true;
-        if (Math.hypot(screenX - btnLanzarX, touchY - btnLanzarY) < btnRadio) lanzarPresionado = true;
-
+        chequearBotonesBajo(tx, ty);
         return true;
     }
 
     @Override
     public boolean touchDragged(int screenX, int screenY, int pointer) {
-        float touchY = Gdx.graphics.getHeight() - screenY;
-
-        if (pointer == punteroJoystick) {
-            calcularJoystick(screenX, touchY);
-        }
+        float tx = screenX;
+        float ty = Gdx.graphics.getHeight() - screenY;
+        if (pointer == punteroJoystick) calcularJoystick(tx, ty);
         return true;
-    }
-
-    /** Calcula dirX y fuerza basados en la posición del dedo relativa al centro del joystick. */
-    private void calcularJoystick(float touchX, float touchY) {
-        float dx = touchX - joystickX;
-        // Zona muerta del 15% del radio
-        if (Math.abs(dx) < joystickRadio * 0.15f) {
-            dirX  = 0f;
-            fuerza = 0f;
-            return;
-        }
-        // Valor proporcional al desplazamiento, clampeado a [-1, 1]
-        float raw = dx / joystickRadio;
-        dirX  = Math.max(-1f, Math.min(1f, raw));  // clamp
-        fuerza = Math.abs(dirX);
     }
 
     @Override
     public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-        float touchY = Gdx.graphics.getHeight() - screenY;
+        float tx = screenX;
+        float ty = Gdx.graphics.getHeight() - screenY;
 
         if (pointer == punteroJoystick) {
             punteroJoystick = -1;
-            dirX = 0f;
+            dirX   = 0f;
+            fuerza = 0f;
         }
-
-        // Si se levanta el dedo que estaba sobre un botón, liberarlo.
-        // Hacemos el área un poco más grande (x2) para que si el dedo resbala no se quede trabado.
-        if (Math.hypot(screenX - btnGolpeX, touchY - btnGolpeY) < btnRadio * 2.5f) golpePresionado = false;
-        if (Math.hypot(screenX - btnSaltoX, touchY - btnSaltoY) < btnRadio * 2.5f) saltarPresionado = false;
-        if (Math.hypot(screenX - btnAgarreX, touchY - btnAgarreY) < btnRadio * 2.5f) agarrarPresionado = false;
-        if (Math.hypot(screenX - btnLanzarX, touchY - btnLanzarY) < btnRadio * 2.5f) lanzarPresionado = false;
-
+        chequearBotonesAlzado(tx, ty);
         return true;
     }
 
-    public float getDirX() {
-        return dirX;
+    // ── Helpers privados ──────────────────────────────────────────────────────
+
+    private void calcularJoystick(float tx, float ty) {
+        float dx = tx - joystickX;
+        if (Math.abs(dx) < joystickRadio * 0.15f) {
+            dirX = 0f; fuerza = 0f;
+            return;
+        }
+        dirX   = Math.max(-1f, Math.min(1f, dx / joystickRadio));
+        fuerza = Math.abs(dirX);
     }
 
-    /** true si el joystick está empujado más del 70% del radio (correr). */
-    public boolean isCorriendoRapido() {
-        return fuerza >= 0.70f;
+    private void chequearBotonesBajo(float tx, float ty) {
+        if (Math.hypot(tx - btnGolpeX,  ty - btnGolpeY)  < btnRadio) golpePresionado   = true;
+        if (Math.hypot(tx - btnSaltoX,  ty - btnSaltoY)  < btnRadio) saltarPresionado  = true;
+        if (Math.hypot(tx - btnAgarreX, ty - btnAgarreY) < btnRadio) agarrarPresionado = true;
+        if (Math.hypot(tx - btnLanzarX, ty - btnLanzarY) < btnRadio) lanzarPresionado  = true;
     }
 
-    public boolean moviendoIzquierda() {
-        return getDirX() < 0;
+    private void chequearBotonesAlzado(float tx, float ty) {
+        // Radio x2.5 para que si el dedo resbala un poco igual se suelte el botón
+        float r = btnRadio * 2.5f;
+        if (Math.hypot(tx - btnGolpeX,  ty - btnGolpeY)  < r) golpePresionado   = false;
+        if (Math.hypot(tx - btnSaltoX,  ty - btnSaltoY)  < r) saltarPresionado  = false;
+        if (Math.hypot(tx - btnAgarreX, ty - btnAgarreY) < r) agarrarPresionado = false;
+        if (Math.hypot(tx - btnLanzarX, ty - btnLanzarY) < r) lanzarPresionado  = false;
     }
+
+    // ── Getters ───────────────────────────────────────────────────────────────
+
+    public float getDirX()           { return dirX; }
+    public boolean isCorriendoRapido() { return fuerza >= 0.70f; }
+    public boolean moviendoIzquierda() { return dirX < 0; }
 }

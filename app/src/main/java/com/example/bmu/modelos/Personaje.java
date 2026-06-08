@@ -43,6 +43,10 @@ public class Personaje {
         return vidaActual;
     }
 
+    public int getVidaMaxima() {
+        return vidaMaxima;
+    }
+
     public int getDañoBase() {
         return dañoBase;
     }

@@ -10,8 +10,8 @@ public class AnimadorHeroe {
     public Animation<TextureRegion> animWalk;
     public Animation<TextureRegion> animRun;
     public Animation<TextureRegion> animPunch;     // Golpe estando parado o caminando (fila 0)
-    public Animation<TextureRegion> animPunchRun;  // Golpe estando corriendo (fila 1)
     public Animation<TextureRegion> animKick;
+    public Animation<TextureRegion> animJump;
     public Animation<TextureRegion> animHurt;
     public Animation<TextureRegion> animFall;
 
@@ -33,11 +33,26 @@ public class AnimadorHeroe {
                 "corriendo/run6.png"
         );
         
-        // ── Golpeando: sprite sheet 8x2 (200x249 px por frame) ──────────────
-        // Fila 0: golpe estando parado/caminando  → PlayMode.NORMAL (se reproduce una sola vez)
-        // Fila 1: golpe estando corriendo          → PlayMode.NORMAL
-        animPunch    = crearAnimacionFila("golpeando/golpeando.png", 200, 249, 8, 0, 0.07f);
-        animPunchRun = crearAnimacionFila("golpeando/golpeando.png", 200, 249, 8, 1, 0.07f);
+        // ── Golpeando: frames individuales ──────────────────────────────────
+        animPunch = crearAnimacion(0.07f, Animation.PlayMode.NORMAL,
+                "golpeando/punch1.png",
+                "golpeando/punch2.png",
+                "golpeando/punch3.png",
+                "golpeando/punch4.png",
+                "golpeando/punch5.png",
+                "golpeando/punch6.png",
+                "golpeando/punch7.png"
+        );
+
+        animJump = crearAnimacion(0.12f, Animation.PlayMode.NORMAL,
+                "saltando/saltando1.png",
+                "saltando/saltando2.png"
+        );
+        
+        animFall = crearAnimacion(0.1f, Animation.PlayMode.NORMAL,
+                "cayendo/cayendo1.png",
+                "cayendo/cayendo2.png"
+        );
 
         // Pendientes por agregar:
         // animKick = ...
@@ -88,6 +103,10 @@ public class AnimadorHeroe {
     }
 
     private Animation<TextureRegion> crearAnimacion(float duracionFrame, String... rutasRelativas) {
+        return crearAnimacion(duracionFrame, Animation.PlayMode.LOOP, rutasRelativas);
+    }
+
+    private Animation<TextureRegion> crearAnimacion(float duracionFrame, Animation.PlayMode playMode, String... rutasRelativas) {
         Array<TextureRegion> frames = new Array<>();
         for (String ruta : rutasRelativas) {
             try {
@@ -107,7 +126,7 @@ public class AnimadorHeroe {
             frames.add(new TextureRegion(tex));
             pixmap.dispose();
         }
-        return new Animation<>(duracionFrame, frames, Animation.PlayMode.LOOP);
+        return new Animation<>(duracionFrame, frames, playMode);
     }
 
     /** Crea una animación en modo ping-pong (ida y vuelta): 1→2→3→4→3→2→1...) */

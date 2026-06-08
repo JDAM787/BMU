@@ -10,7 +10,7 @@ import com.badlogic.gdx.physics.box2d.*;
 public class MundoFisico {
 
     // Escala píxeles → metros para Box2D (Box2D trabaja en metros)
-    public static final float PPM = 64f; // 64 píxeles = 1 metro
+    public static final float PPM = 120f; // 64 píxeles = 1 metro
 
     // Gravedad: -9.8 m/s² en el eje Y (hacia abajo)
     private static final Vector2 GRAVEDAD = new Vector2(0, -9.8f);
@@ -40,7 +40,7 @@ public class MundoFisico {
         EdgeShape forma = new EdgeShape();
         // Línea horizontal que representa la parte superior de la acera del escenario.
         // Ajustar este valor hasta que el personaje quede parado ENCIMA de la acera visual.
-        float ySuelo = 3.5f;
+        float ySuelo = 1.5f;
         forma.set(new Vector2(-100, ySuelo), new Vector2(100, ySuelo));
 
         FixtureDef fixture = new FixtureDef();
