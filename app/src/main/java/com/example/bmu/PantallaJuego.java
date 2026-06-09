@@ -251,11 +251,8 @@ public class PantallaJuego implements Screen {
         }
 
         // Escala del personaje: misma lógica de antes
-        float alturaVisualDeseadaM = 2.5f;          // metros en pantalla
-        float altoCanvasFijoPx     = 282f;           // del script
-        float escalaPixelAMetro    = alturaVisualDeseadaM / altoCanvasFijoPx;
-        float altoCanvasM          = 282f * escalaPixelAMetro;  // = alturaVisualDeseadaM siempre
-        float anchoCanvasM         = 243f * escalaPixelAMetro;  // proporcional 
+        float altoCanvasM  = 300f / MundoFisico.PPM;
+        float anchoCanvasM = 250f / MundoFisico.PPM;
 
         float posX = entJugador.getCuerpo().getPosition().x;
         float posY = entJugador.getCuerpo().getPosition().y;
@@ -582,16 +579,13 @@ public class PantallaJuego implements Screen {
 
         // Escala del enemigo
 
-        float alturaVisualDeseadaM = 2.5f;
-        float altoCanvasFijoPx     = 282f;
-        float escalaPixelAMetro    = alturaVisualDeseadaM / altoCanvasFijoPx;
-        float altoCanvasM          = 282f * escalaPixelAMetro;
-        float anchoCanvasM         = 243f * escalaPixelAMetro;
+        float altoCanvasM  = 300f / MundoFisico.PPM;
+        float anchoCanvasM = 240f / MundoFisico.PPM;
 
         float altoCuerpoFisicoM = 160f / MundoFisico.PPM;
         float dibX = enX - (anchoCanvasM / 2f);
         float dibY = enY - (altoCuerpoFisicoM / 2f);
-
+            
         boolean mirandoDerechaEnemigo;
         if (Math.abs(enemigo.getCuerpo().getLinearVelocity().x) > 0.1f)
             mirandoDerechaEnemigo = enemigo.getCuerpo().getLinearVelocity().x > 0;
