@@ -21,6 +21,13 @@ import com.example.bmu.vista.AnimadorEnemigoDebil;
 
 public class PantallaJuego implements Screen {
 
+    // Transiciones
+
+    private float tiempoFade = 0f;
+    private boolean fadeIn = false;
+    private boolean fadeOut = false;
+    private static final float DURACION_FADE = 0.5f;
+
     // ── Físicas ──────────────────────────────────────────────────────────────
     private MundoFisico       mundo;
     private FabricaCuerpos    fabrica;
@@ -45,10 +52,19 @@ public class PantallaJuego implements Screen {
     private SpriteBatch        batch;
     private Texture            texturaTubo;
     private Texture            texturaCuchillo;
+
+    // Mundo
     private GestorEscenarios   gestorEscenarios;
+
+    private static final float SUELO_AZOTEA = 1.55f;
+    private static final float SUELO_CALLE  = 1f;
+    private static final float SUELO_MUELLE = 0f;
+
+    // Animadores
     private AnimadorHeroe      animadorHeroe;
     private AnimadorEnemigoDebil animadorEnemigoDebil;
 
+    // Estados
     private float   stateTime           = 0f;
     private boolean mirandoDerecha      = true;
     private String  estadoAnimAnterior  = "idle";
@@ -95,6 +111,7 @@ public class PantallaJuego implements Screen {
         Body cDebil   = fabrica.crearCuerpoEnemigo(500, 304, 100, 160, true,  enD);
         Body cFuerte  = fabrica.crearCuerpoEnemigo(750, 304, 120, 180, false, enF);
 
+
         // 5. Entidades físicas
         entJugador       = new EntidadFisica(cJugador, jugador);
         entEnemigoDebil  = new EntidadFisica(cDebil,   enD);
@@ -125,7 +142,13 @@ public class PantallaJuego implements Screen {
         batch                = new SpriteBatch();
         texturaTubo          = new Texture("armas/tubo.png");
         texturaCuchillo      = new Texture("armas/cuchillo.png");
+        
         gestorEscenarios     = new GestorEscenarios();
+        gestorEscenarios.setCallbackCambioEscenario(() -> {
+           //Reposiciona al jugador al cambiar de escenario
+           reposicionarJugadorPorEscenario(); 
+        });
+
         animadorHeroe        = new AnimadorHeroe();
         animadorEnemigoDebil = new AnimadorEnemigoDebil(1);
 
@@ -141,6 +164,9 @@ public class PantallaJuego implements Screen {
 
         stateTime += delta;
         manejarEntradaTactil();
+        if(!gestorEscenarios.estaEnTransicion()){
+            verificarCambioEscenario();
+        }
         actualizarEnemigos(delta);
         mundo.actualizar(delta);
         escucha.procesarEventosPendientes();
@@ -172,7 +198,9 @@ public class PantallaJuego implements Screen {
         // Escenario de fondo
         float anchoPantallaM = Gdx.graphics.getWidth()  / MundoFisico.PPM;
         float altoPantallaM  = Gdx.graphics.getHeight() / MundoFisico.PPM;
-        gestorEscenarios.dibujar(batch, anchoPantallaM, altoPantallaM);
+        float camaraIzqX = camara.position.x - anchoPantallaM / 2f;
+        float camaraAbajoY = camara.position.y - altoPantallaM / 2f;
+        gestorEscenarios.dibujar(batch, camaraIzqX, camaraAbajoY, anchoPantallaM, altoPantallaM);
 
         // ── Animación del héroe ──────────────────────────────────────────────
         float velX = entJugador.getCuerpo().getLinearVelocity().x;
@@ -222,8 +250,8 @@ public class PantallaJuego implements Screen {
             if (controles.getDirX() < 0) mirandoDerecha = false;
         }
 
-        // Escala héroe: misma lógica de antes
-        float alturaVisualDeseadaM = 4.0f;          // metros en pantalla
+        // Escala del personaje: misma lógica de antes
+        float alturaVisualDeseadaM = 2.5f;          // metros en pantalla
         float altoCanvasFijoPx     = 282f;           // del script
         float escalaPixelAMetro    = alturaVisualDeseadaM / altoCanvasFijoPx;
         float altoCanvasM          = 282f * escalaPixelAMetro;  // = alturaVisualDeseadaM siempre
@@ -261,6 +289,38 @@ public class PantallaJuego implements Screen {
         dibujarHUD(batch);
 
         batch.end();
+
+        // Actualizar tiempo de fade
+        if (fadeIn || fadeOut) {
+            tiempoFade += delta;
+        }
+
+        // Dibujar fade si está activo
+        if (fadeIn || fadeOut) {
+            float alpha = 0f; // inicialización segura
+            if (fadeIn) {
+                alpha = Math.min(1f, tiempoFade / DURACION_FADE);
+                if (tiempoFade >= DURACION_FADE) {
+                    fadeIn = false;
+                    // Cambiar al escenario destino (esto activa el callback que reposiciona)
+                    gestorEscenarios.cambiarEscenario(gestorEscenarios.getEscenarioDestino());
+                    // Iniciar fadeOut
+                    fadeOut = true;
+                    tiempoFade = 0f;
+                }
+            } else if (fadeOut) {
+                alpha = 1f - Math.min(1f, tiempoFade / DURACION_FADE);
+                if (tiempoFade >= DURACION_FADE) {
+                    fadeOut = false;
+                    // Transición completada
+                }
+            }
+            // Dibujar rectángulo negro semitransparente
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            shapeRenderer.setColor(0, 0, 0, alpha);
+            shapeRenderer.rect(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+            shapeRenderer.end();
+        }
 
         // ── HUD táctil (coordenadas de pantalla en píxeles) ──────────────────
         shapeRenderer.setProjectionMatrix(
@@ -307,10 +367,17 @@ public class PantallaJuego implements Screen {
 
     private void manejarEntradaTactil() {
         float dirX = controles.getDirX();
+        float limiteDerechoMetros = 19.2f;
 
         float xJugadorMetros       = entJugador.getCuerpo().getPosition().x;
         float limiteIzquierdoMetros = 0.8f;
+        
         if (dirX < 0 && xJugadorMetros <= limiteIzquierdoMetros) {
+            dirX = 0;
+            entJugador.getCuerpo().setLinearVelocity(0, entJugador.getCuerpo().getLinearVelocity().y);
+        }
+
+        if (dirX > 0 && xJugadorMetros >= limiteDerechoMetros) {
             dirX = 0;
             entJugador.getCuerpo().setLinearVelocity(0, entJugador.getCuerpo().getLinearVelocity().y);
         }
@@ -513,7 +580,9 @@ public class PantallaJuego implements Screen {
             primerFrame  = animador.animIdle.getKeyFrame(0f);
         }
 
-        float alturaVisualDeseadaM = 4.0f;
+        // Escala del enemigo
+
+        float alturaVisualDeseadaM = 2.5f;
         float altoCanvasFijoPx     = 282f;
         float escalaPixelAMetro    = alturaVisualDeseadaM / altoCanvasFijoPx;
         float altoCanvasM          = 282f * escalaPixelAMetro;
@@ -533,5 +602,64 @@ public class PantallaJuego implements Screen {
         if (!mirandoDerechaEnemigo) drawFrame.flip(true, false);
 
         batch.draw(drawFrame, dibX, dibY, anchoCanvasM, altoCanvasM);
+    }
+
+    private void verificarCambioEscenario() {
+        if (fadeIn || fadeOut) return;
+
+        float xJugador = entJugador.getCuerpo().getPosition().x;
+        float yJugador = entJugador.getCuerpo().getPosition().y;
+        int escenarioActual = gestorEscenarios.getEscenarioActivo();
+
+        final float LIMITE_DERECHO   = 18f;
+        final float LIMITE_IZQUIERDO = 2f;
+        final float PUNTO_CAIDA      = 2f;
+
+        if (escenarioActual == 0 && (yJugador < PUNTO_CAIDA || xJugador > LIMITE_DERECHO)) {
+            iniciarFadeYTransicion(1);
+        } else if (escenarioActual == 1 && xJugador > LIMITE_DERECHO) {  
+            iniciarFadeYTransicion(2);
+        } else if (escenarioActual == 1 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a azotea
+            iniciarFadeYTransicion(0);
+        } else if (escenarioActual == 2 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a calle
+            iniciarFadeYTransicion(1);
+        }
+    }
+
+    private void iniciarFadeYTransicion(int nuevoEscenario) {
+        fadeIn = true;
+        fadeOut = false;
+        tiempoFade = 0f;
+        gestorEscenarios.setEscenarioDestino(nuevoEscenario); 
+    }
+
+
+   private void reposicionarJugadorPorEscenario() {
+        int escenario = gestorEscenarios.getEscenarioActivo();
+        Body cuerpoJugador = entJugador.getCuerpo();
+
+        float ySuelo;
+        float xJugador;
+
+        if (escenario == 0) {
+            ySuelo    = SUELO_AZOTEA;
+            xJugador  = 16f;
+        } else if (escenario == 1) {
+            ySuelo    = SUELO_CALLE;
+            xJugador  = 3f;
+        } else { // escenario 2: muelle
+            ySuelo    = SUELO_MUELLE;
+            xJugador  = 3f;
+        }
+
+        mundo.crearSuelo(ySuelo);
+
+        float mitadCuerpo = 160f / MundoFisico.PPM / 2f;
+        cuerpoJugador.setTransform(xJugador, ySuelo + mitadCuerpo, 0);
+        cuerpoJugador.setLinearVelocity(0, 0);
+        cuerpoJugador.setAngularVelocity(0);
+
+        camara.position.x = cuerpoJugador.getPosition().x;
+        camara.update();
     }
 }
