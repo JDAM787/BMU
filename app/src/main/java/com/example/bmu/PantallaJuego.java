@@ -55,10 +55,12 @@ public class PantallaJuego implements Screen {
 
     // Mundo
     private GestorEscenarios   gestorEscenarios;
+    private int escenarioOrigen = 0;
 
     private static final float SUELO_AZOTEA = 1.55f;
     private static final float SUELO_CALLE  = 1f;
     private static final float SUELO_MUELLE = 0f;
+    private static final float SUELO_INDUSTRIA = 1f;
 
     // Animadores
     private AnimadorHeroe      animadorHeroe;
@@ -216,7 +218,10 @@ public class PantallaJuego implements Screen {
         }
 
         String estadoAnim;
-        if (isAtacando) {
+
+        if (entJugador.getModelo().tiempoHurt > 0) {
+            estadoAnim = "hurt";
+        } else if (isAtacando) {
             estadoAnim = "punch";
         } else if (velY > 0.5f && animadorHeroe.animJump != null) {
             estadoAnim = "jump";
@@ -237,6 +242,7 @@ public class PantallaJuego implements Screen {
 
         TextureRegion frameActual;
         switch (estadoAnim) {
+            case "hurt":     frameActual = animadorHeroe.animHurt.getKeyFrame(stateTime, false);   break;
             case "punch":    frameActual = animadorHeroe.animPunch.getKeyFrame(stateTime, false);    break;
             case "jump":     frameActual = animadorHeroe.animJump.getKeyFrame(stateTime, false);     break;
             case "fall":     frameActual = animadorHeroe.animFall.getKeyFrame(stateTime, true);      break;
@@ -610,17 +616,22 @@ public class PantallaJuego implements Screen {
         final float PUNTO_CAIDA      = 2f;
 
         if (escenarioActual == 0 && (yJugador < PUNTO_CAIDA || xJugador > LIMITE_DERECHO)) {
-            iniciarFadeYTransicion(1);
-        } else if (escenarioActual == 1 && xJugador > LIMITE_DERECHO) {  
-            iniciarFadeYTransicion(2);
-        } else if (escenarioActual == 1 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a azotea
-            iniciarFadeYTransicion(0);
-        } else if (escenarioActual == 2 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a calle
-            iniciarFadeYTransicion(1);
-        }
+                iniciarFadeYTransicion(1);
+            } else if (escenarioActual == 1 && xJugador > LIMITE_DERECHO) {  
+                iniciarFadeYTransicion(2);
+            } else if (escenarioActual == 1 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a azotea
+                iniciarFadeYTransicion(0);
+            } else if (escenarioActual == 2 && xJugador > LIMITE_DERECHO) {   // ← NUEVO: derecha pasa a industria
+                iniciarFadeYTransicion(3);
+            } else if (escenarioActual == 2 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a calle
+                iniciarFadeYTransicion(1);
+            } else if (escenarioActual == 3 && xJugador < LIMITE_IZQUIERDO) { // ← izquierda vuelve a muelle
+                iniciarFadeYTransicion(2);
+            }
     }
 
     private void iniciarFadeYTransicion(int nuevoEscenario) {
+        escenarioOrigen = gestorEscenarios.getEscenarioActivo();
         fadeIn = true;
         fadeOut = false;
         tiempoFade = 0f;
@@ -640,9 +651,20 @@ public class PantallaJuego implements Screen {
             xJugador  = 16f;
         } else if (escenario == 1) {
             ySuelo    = SUELO_CALLE;
-            xJugador  = 3f;
-        } else { // escenario 2: muelle
+            if (escenarioOrigen == 2) {
+                xJugador = 16f; 
+            } else {
+                xJugador = 3f;
+            }
+        } else if (escenario == 2) { 
             ySuelo    = SUELO_MUELLE;
+            if (escenarioOrigen == 3) {
+                xJugador = 16f;
+            } else {
+                xJugador = 3f;
+            }
+        } else { 
+            ySuelo    = SUELO_INDUSTRIA;
             xJugador  = 3f;
         }
 

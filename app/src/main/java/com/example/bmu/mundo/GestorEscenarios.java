@@ -7,12 +7,12 @@ public class GestorEscenarios {
 
     private Texture texturaAzotea;
     private Texture texturaMuelle;
-    private Texture texturaAzoteaTransicion;
     private Texture texturaAbajo;
-    private Texture texturaAbajoTransicion;
+    private Texture texturaIndustria;
+
 
     private Texture texturaActual;
-    private int escenarioActivo; // 0: azotea, 1: abajo
+    private int escenarioActivo; 
     
     // Variables para la transición
     private boolean enTransicion;
@@ -23,9 +23,10 @@ public class GestorEscenarios {
     public GestorEscenarios() {
         texturaAzotea = new Texture("escenarios/azotea.png");
         texturaMuelle = new Texture("escenarios/muelle.png");
-        texturaAzoteaTransicion = new Texture("escenarios/azotea-transicion.png");
         texturaAbajo = new Texture("escenarios/abajo-de-azotea.png");
-        texturaAbajoTransicion = new Texture("escenarios/abajo-de-azotea-transicion.png");
+        texturaIndustria = new Texture("escenarios/e1_industrias.png");
+
+
 
         escenarioActivo = 0;
         texturaActual = texturaAzotea;
@@ -66,6 +67,9 @@ public class GestorEscenarios {
         } else if (nuevoEscenario == 2) {
             texturaActual = texturaMuelle;
             escenarioActivo = 2;
+        } else if (nuevoEscenario == 3) {
+            texturaActual = texturaIndustria;
+            escenarioActivo = 3;
         }
 
         if (callbackCambioEscenario != null) {
@@ -80,15 +84,17 @@ public class GestorEscenarios {
         enTransicion = true;
         tiempoTransicion = 0;
         escenarioDestino = haciaEscenario;
-        
-        // Mostrar la textura de transición correspondiente
+
+        // Mostrar la textura correspondiente
         if (haciaEscenario == 0) {
-            texturaActual = texturaAzoteaTransicion;
-        } else if (haciaEscenario == 1) {
-            texturaActual = texturaAbajoTransicion;
-        } else if (haciaEscenario == 2) {
-            texturaActual = texturaMuelle;
-        }
+                texturaActual = texturaAzotea;
+            } else if (haciaEscenario == 1) {
+                texturaActual = texturaAbajo;
+            } else if (haciaEscenario == 2) {
+                texturaActual = texturaMuelle;
+            } else if (haciaEscenario == 3) {
+                texturaActual = texturaIndustria; 
+            }
     }
     
     public void mostrarTransicion(int haciaEscenario) {
@@ -118,8 +124,8 @@ public class GestorEscenarios {
 
     public void dispose() {
         texturaAzotea.dispose();
-        texturaAzoteaTransicion.dispose();
         texturaAbajo.dispose();
-        texturaAbajoTransicion.dispose();
+        texturaMuelle.dispose();
+        texturaIndustria.dispose();
     }
 }

@@ -54,10 +54,13 @@ public class AnimadorHeroe {
                 "cayendo/cayendo2.png"
         );
 
+        // Agregamos la animación de recibir daño con PlayMode.NORMAL
+        animHurt = crearAnimacion(0.2f, Animation.PlayMode.NORMAL,
+                "recibeDano/dano1.png"
+        );
+
         // Pendientes por agregar:
         // animKick = ...
-        // animHurt = ...
-        // animFall = ...
     }
 
     /**

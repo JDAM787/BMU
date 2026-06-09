@@ -2,8 +2,8 @@ from PIL import Image
 import os, glob, sys
 
 # ── Configuración ────────────────────────────────────────────────────────────
-BASE_DIR = r"C:\Users\germa\OneDrive\Desktop\BMU\app\src\main\assets\personajes\heroe\sprites-personaje"
-CARPETAS = ["quieto", "caminando", "corriendo", "saltando", "cayendo", "golpeando"]
+BASE_DIR = r"C:\BMU\app\src\main\assets\personajes\heroe\sprites-personaje"
+CARPETAS = ["quieto", "caminando", "corriendo", "saltando", "cayendo", "golpeando", "recibeDano"]
 
 # ★ NUEVO: Altura fija para TODOS los personajes (en píxeles, SIN márgenes)
 ALTURA_OBJETIVO = 200   # Ajusta este valor según prefieras (ej. 200)
