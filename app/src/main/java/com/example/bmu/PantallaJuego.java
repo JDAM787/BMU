@@ -40,7 +40,7 @@ public class PantallaJuego implements Screen {
     private EntidadFisica entEnemigoFuerte;
 
     private Body      cuerpoArma;
-    private TuboMetal armaFisica;
+    private Arma      armaFisica;
 
     // ── UI táctil ────────────────────────────────────────────────────────────
     private ControlesTouch controles;
@@ -75,6 +75,23 @@ public class PantallaJuego implements Screen {
     private boolean isAtacando          = false;
     private float   tiempoAtacando      = 0f;
 
+    // Sistema de vidas y Game Over
+    private int     vidas               = 3;
+    private boolean isGameOver          = false;
+    private Texture texturaGameOver;
+    private com.badlogic.gdx.graphics.g2d.BitmapFont font;
+    private float   tiempoGameOver      = 0f;
+    private boolean isPlayerDying       = false;
+    private float   tiempoMuerteJugador = 0f;
+    private boolean isArmaRecogida      = false;
+
+    // Estados para la mecánica de agarre
+    private boolean isGrabPunching      = false;
+    private float   tiempoGrabPunching  = 0f;
+    private boolean isThrowing          = false;
+    private float   tiempoThrowing      = 0f;
+    private float   tiempoRecibeDanoGrab = 0f;
+
     // Estados para EnemigoDebil
     private float   stateTimeDebil      = 0f;
     private float   cooldownAtaqueDebil = 0f;
@@ -104,7 +121,7 @@ public class PantallaJuego implements Screen {
         mundo.getWorld().setContactListener(escucha);
 
         // 3. Modelos
-        Jugador      jugador = new Jugador(100, 20);
+        Jugador      jugador = new Jugador(100, 10);
         EnemigoDebil enD     = new EnemigoDebil();
         EnemigoFuerte enF    = new EnemigoFuerte();
 
@@ -119,10 +136,9 @@ public class PantallaJuego implements Screen {
         entEnemigoDebil  = new EntidadFisica(cDebil,   enD);
         entEnemigoFuerte = new EntidadFisica(cFuerte,  enF);
 
-        // 6. Arma
-        armaFisica = new TuboMetal();
-        jugador.equiparArma(armaFisica);
-        cuerpoArma = fabrica.crearCuerpoArma(200, 80, 30, 10, armaFisica);
+        // 6. Arma (Cuchillo en el suelo, jugador inicia desarmado)
+        armaFisica = new Cuchillo();
+        cuerpoArma = fabrica.crearCuerpoArma(300, 80, 30, 10, armaFisica);
 
         // 7. Sistema de agarre
         sistemaAgarre = new SistemaAgarre(jugador, cJugador);
@@ -157,6 +173,11 @@ public class PantallaJuego implements Screen {
         // HUD
         texturaHUDFondo = new Texture("HUD/salud/salud_fondo.png");
         texturaHUDBarra = new Texture("HUD/salud/salud_barra.png");
+
+        // Game Over y fuentes
+        texturaGameOver = new Texture("HUD/gameover.png");
+        font = new com.badlogic.gdx.graphics.g2d.BitmapFont();
+        font.getData().setScale(1.5f);
     }
 
     @Override
@@ -164,17 +185,26 @@ public class PantallaJuego implements Screen {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        stateTime += delta;
-        manejarEntradaTactil();
-        if(!gestorEscenarios.estaEnTransicion()){
-            verificarCambioEscenario();
+        if (isGameOver) {
+            tiempoGameOver += delta;
+            if (Gdx.input.justTouched()) {
+                reiniciarJuegoCompleto();
+            }
+        } else {
+            stateTime += delta;
+            if (!isPlayerDying) {
+                manejarEntradaTactil();
+                if (!gestorEscenarios.estaEnTransicion()) {
+                    verificarCambioEscenario();
+                }
+            }
+            actualizarEnemigos(delta);
+            mundo.actualizar(delta);
+            escucha.procesarEventosPendientes();
         }
-        actualizarEnemigos(delta);
-        mundo.actualizar(delta);
-        escucha.procesarEventosPendientes();
 
         // ── Arrastrar enemigo agarrado ───────────────────────────────────────
-        if (sistemaAgarre.tienEnemigoAgarrado()) {
+        if (!isGameOver && sistemaAgarre.tienEnemigoAgarrado()) {
             com.badlogic.gdx.math.Vector2 posJ = entJugador.getCuerpo().getPosition();
             float offsetX = mirandoDerecha ? 0.8f : -0.8f;
             Body cAgarrado = sistemaAgarre.getCuerpoAgarrado();
@@ -217,10 +247,44 @@ public class PantallaJuego implements Screen {
             }
         }
 
+        final float DURACION_GRAB_PUNCH = 0.3f;
+        if (isGrabPunching) {
+            tiempoGrabPunching += delta;
+            if (tiempoGrabPunching >= DURACION_GRAB_PUNCH) {
+                isGrabPunching     = false;
+                tiempoGrabPunching = 0f;
+            }
+        }
+
+        final float DURACION_THROW = 0.3f;
+        if (isThrowing) {
+            tiempoThrowing += delta;
+            if (tiempoThrowing >= DURACION_THROW) {
+                isThrowing     = false;
+                tiempoThrowing = 0f;
+            }
+        }
+
+        if (tiempoRecibeDanoGrab > 0) {
+            tiempoRecibeDanoGrab -= delta;
+        }
+
         String estadoAnim;
 
-        if (entJugador.getModelo().tiempoHurt > 0) {
+        if (isPlayerDying) {
+            if (tiempoMuerteJugador < 1.0f && !entJugador.estaEnSuelo()) {
+                estadoAnim = "deathFall";
+            } else {
+                estadoAnim = "dead";
+            }
+        } else if (entJugador.getModelo().tiempoHurt > 0) {
             estadoAnim = "hurt";
+        } else if (isThrowing) {
+            estadoAnim = "throw";
+        } else if (isGrabPunching) {
+            estadoAnim = "grabPunch";
+        } else if (sistemaAgarre.tienEnemigoAgarrado()) {
+            estadoAnim = "grab";
         } else if (isAtacando) {
             estadoAnim = "punch";
         } else if (velY > 0.5f && animadorHeroe.animJump != null) {
@@ -242,23 +306,28 @@ public class PantallaJuego implements Screen {
 
         TextureRegion frameActual;
         switch (estadoAnim) {
-            case "hurt":     frameActual = animadorHeroe.animHurt.getKeyFrame(stateTime, false);   break;
-            case "punch":    frameActual = animadorHeroe.animPunch.getKeyFrame(stateTime, false);    break;
-            case "jump":     frameActual = animadorHeroe.animJump.getKeyFrame(stateTime, false);     break;
-            case "fall":     frameActual = animadorHeroe.animFall.getKeyFrame(stateTime, true);      break;
-            case "run":      frameActual = animadorHeroe.animRun.getKeyFrame(stateTime, true);       break;
-            case "walk":     frameActual = animadorHeroe.animWalk.getKeyFrame(stateTime, true);      break;
-            default:         frameActual = animadorHeroe.animIdle.getKeyFrame(stateTime, true);      break;
+            case "hurt":      frameActual = animadorHeroe.animHurt.getKeyFrame(stateTime, false);   break;
+            case "punch":     frameActual = animadorHeroe.animPunch.getKeyFrame(stateTime, false);    break;
+            case "jump":      frameActual = animadorHeroe.animJump.getKeyFrame(stateTime, false);     break;
+            case "fall":      frameActual = animadorHeroe.animFall.getKeyFrame(stateTime, true);      break;
+            case "run":       frameActual = animadorHeroe.animRun.getKeyFrame(stateTime, true);       break;
+            case "walk":      frameActual = animadorHeroe.animWalk.getKeyFrame(stateTime, true);      break;
+            case "grab":      frameActual = animadorHeroe.animGrab.getKeyFrame(stateTime, true);      break;
+            case "grabPunch": frameActual = animadorHeroe.animGrabPunch.getKeyFrame(stateTime, false); break;
+            case "throw":     frameActual = animadorHeroe.animThrow.getKeyFrame(stateTime, false);     break;
+            case "deathFall": frameActual = animadorHeroe.animDeathFall.getKeyFrame(tiempoMuerteJugador, false); break;
+            case "dead":      frameActual = animadorHeroe.animDead.getKeyFrame(tiempoMuerteJugador, false); break;
+            default:          frameActual = animadorHeroe.animIdle.getKeyFrame(stateTime, true);      break;
         }
 
-        if (!isAtacando) {
+        if (!isAtacando && !isGrabPunching && !isThrowing && !isPlayerDying) {
             if (controles.getDirX() > 0) mirandoDerecha = true;
             if (controles.getDirX() < 0) mirandoDerecha = false;
         }
 
-        // Escala del personaje: misma lógica de antes
-        float altoCanvasM  = 300f / MundoFisico.PPM;
-        float anchoCanvasM = 250f / MundoFisico.PPM;
+        // Escala del personaje: ajustada a la normalización de 249 x 240 px
+        float altoCanvasM  = 240f / MundoFisico.PPM;
+        float anchoCanvasM = 249f / MundoFisico.PPM;
 
         float posX = entJugador.getCuerpo().getPosition().x;
         float posY = entJugador.getCuerpo().getPosition().y;
@@ -267,26 +336,36 @@ public class PantallaJuego implements Screen {
         float dibY = piesFisicosY;
         float dibX = posX - (anchoCanvasM / 2f);
 
-        TextureRegion drawFrame = new TextureRegion(frameActual);
-        if (!mirandoDerecha) drawFrame.flip(true, false);
-        batch.draw(drawFrame, dibX, dibY, anchoCanvasM, altoCanvasM);
+        boolean mostrarJugador = true;
+        if (isPlayerDying && tiempoMuerteJugador > 1.5f) {
+            mostrarJugador = ((int)((tiempoMuerteJugador - 1.5f) * 15)) % 2 == 0;
+        }
+
+        if (mostrarJugador) {
+            TextureRegion drawFrame = new TextureRegion(frameActual);
+            if (!mirandoDerecha) drawFrame.flip(true, false);
+            batch.draw(drawFrame, dibX, dibY, anchoCanvasM, altoCanvasM);
+        }
 
         // Enemigo débil
         dibujarEnemigoDebil(batch, entEnemigoDebil, animadorEnemigoDebil, stateTimeDebil, isAtacandoDebil);
 
-        // Arma
-        float armaX    = cuerpoArma.getPosition().x;
-        float armaY    = cuerpoArma.getPosition().y;
-        float anguloA  = cuerpoArma.getAngle() * MathUtils.radiansToDegrees;
-        float anchoArma = 30f / MundoFisico.PPM;
-        float altoArma  = 10f / MundoFisico.PPM;
-        batch.draw(texturaTubo,
-                armaX - anchoArma / 2f, armaY - altoArma / 2f,
-                anchoArma / 2f, altoArma / 2f,
-                anchoArma, altoArma,
-                1f, 1f, anguloA,
-                0, 0, texturaTubo.getWidth(), texturaTubo.getHeight(),
-                false, false);
+        // Arma (solo si no está recogida)
+        if (!isArmaRecogida && cuerpoArma != null) {
+            float armaX    = cuerpoArma.getPosition().x;
+            float armaY    = cuerpoArma.getPosition().y;
+            float anguloA  = cuerpoArma.getAngle() * MathUtils.radiansToDegrees;
+            float anchoArma = 30f / MundoFisico.PPM;
+            float altoArma  = 10f / MundoFisico.PPM;
+            Texture texArma = (armaFisica instanceof Cuchillo) ? texturaCuchillo : texturaTubo;
+            batch.draw(texArma,
+                    armaX - anchoArma / 2f, armaY - altoArma / 2f,
+                    anchoArma / 2f, altoArma / 2f,
+                    anchoArma, altoArma,
+                    1f, 1f, anguloA,
+                    0, 0, texArma.getWidth(), texArma.getHeight(),
+                    false, false);
+        }
 
         // HUD salud
         dibujarHUD(batch);
@@ -336,6 +415,50 @@ public class PantallaJuego implements Screen {
         // ── Debug Box2D ──────────────────────────────────────────────────────
         camara.update();
         debugRenderer.render(mundo.getWorld(), camara.combined);
+
+        // ── GAME OVER OVERLAY ────────────────────────────────────────────────
+        if (isGameOver) {
+            // 1. Dibujar overlay oscuro
+            Gdx.gl.glEnable(GL20.GL_BLEND);
+            Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+            shapeRenderer.setProjectionMatrix(
+                    new com.badlogic.gdx.math.Matrix4().setToOrtho2D(
+                            0, 0,
+                            Gdx.graphics.getWidth(),
+                            Gdx.graphics.getHeight()));
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            shapeRenderer.setColor(0f, 0f, 0f, 0.75f);
+            shapeRenderer.rect(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+            shapeRenderer.end();
+            Gdx.gl.glDisable(GL20.GL_BLEND);
+
+            // 2. Dibujar imagen de Game Over y texto en coordenadas de pantalla
+            batch.setProjectionMatrix(new com.badlogic.gdx.math.Matrix4().setToOrtho2D(
+                    0, 0,
+                    Gdx.graphics.getWidth(),
+                    Gdx.graphics.getHeight()));
+            batch.begin();
+
+            float goAncho = Gdx.graphics.getWidth() * 0.45f;
+            float goAlto  = goAncho * ((float) texturaGameOver.getHeight() / texturaGameOver.getWidth());
+            float goX     = (Gdx.graphics.getWidth() - goAncho) / 2f;
+            float goY     = (Gdx.graphics.getHeight() - goAlto) / 2f + 40f;
+
+            batch.draw(texturaGameOver, goX, goY, goAncho, goAlto);
+
+            // Dibujar texto instructivo con escala dinámica y efecto de pulso (parpadeo tipo "insert coin" retro-arcade)
+            float textAlpha = 0.3f + 0.7f * (float) Math.abs(Math.sin(tiempoGameOver * 3.5f));
+            font.setColor(1f, 1f, 1f, textAlpha);
+            
+            float scale = Gdx.graphics.getHeight() / 480f * 0.8f;
+            if (scale < 1.0f) scale = 1.0f;
+            font.getData().setScale(scale);
+            
+            com.badlogic.gdx.graphics.g2d.GlyphLayout layout = new com.badlogic.gdx.graphics.g2d.GlyphLayout(font, "TOCA LA PANTALLA PARA REINICIAR");
+            font.draw(batch, layout, (Gdx.graphics.getWidth() - layout.width) / 2f, goY - 40f);
+
+            batch.end();
+        }
     }
 
     // Dibujar HUD
@@ -349,11 +472,13 @@ public class PantallaJuego implements Screen {
         float hudX = camara.position.x - (Gdx.graphics.getWidth() / MundoFisico.PPM) / 2f;
         float hudY = camara.position.y + (Gdx.graphics.getHeight() / MundoFisico.PPM) / 2f - hudAlto;
 
-        // Posición y tamaño de la zona de la barra dentro del HUD
-        float barraX     = hudX   + hudAncho * 0.42f;
-        float barraY     = hudY   + hudAlto  * 0.45f;
-        float barraAncho = hudAncho * 0.47f; // ancho total de la barra al 100%
-        float barraAlto  = hudAlto  * 0.16f;
+        // Posición y tamaño de la zona de la barra dentro del HUD usando proporciones exactas de la textura de 1536x1024
+        // El espacio vacío donde va la barra empieza en X=403 (fracción 403/1536) y Y=503 (fracción 503/1024)
+        // El ancho de la barra es 874px (fracción 874/1536) y el alto es 98px (fracción 98/1024)
+        float barraX     = hudX   + hudAncho * (403f / 1536f);
+        float barraY     = hudY   + hudAlto  * (503f / 1024f);
+        float barraAncho = hudAncho * (874f / 1536f); // ancho total de la barra al 100%
+        float barraAlto  = hudAlto  * (98f / 1024f);
 
         // 1. Dibujar la barra roja escalada según vida (usando TextureRegion para recortar)
         TextureRegion regionBarra = new TextureRegion(texturaHUDBarra,
@@ -364,11 +489,30 @@ public class PantallaJuego implements Screen {
 
         // 2. Dibujar el marco encima (tapa los bordes de la barra)
         batch.draw(texturaHUDFondo, hudX, hudY, hudAncho, hudAlto);
+
+        // 3. Dibujar las vidas en la esquina superior derecha
+        float rightX = camara.position.x + (Gdx.graphics.getWidth() / MundoFisico.PPM) / 2f;
+        float topY    = camara.position.y + (Gdx.graphics.getHeight() / MundoFisico.PPM) / 2f;
+
+        TextureRegion regionCara = new TextureRegion(texturaHUDFondo, 141, 350, 262, 259);
+        float tamanoVida = 0.45f; // en metros
+        float espaciado = 0.5f;
+        float vidasX = rightX - 0.2f - tamanoVida;
+        float vidasY = topY - 0.2f - tamanoVida;
+
+        for (int i = 0; i < vidas; i++) {
+            batch.draw(regionCara, vidasX - (i * espaciado), vidasY, tamanoVida, tamanoVida);
+        }
     }
 
     // ── Entrada táctil ───────────────────────────────────────────────────────
 
     private void manejarEntradaTactil() {
+        if (entJugador.getModelo().tiempoHurt > 0) {
+            entJugador.getCuerpo().setLinearVelocity(0, entJugador.getCuerpo().getLinearVelocity().y);
+            return;
+        }
+
         float dirX = controles.getDirX();
         float limiteDerechoMetros = 19.2f;
 
@@ -395,23 +539,48 @@ public class PantallaJuego implements Screen {
 
         if (controles.saltarPresionado) entJugador.saltar();
 
-        if (controles.golpePresionado && !isAtacando) {
-            isAtacando     = true;
-            tiempoAtacando = 0f;
-            stateTime      = 0f;
-            float vx = entJugador.getCuerpo().getLinearVelocity().x;
+        if (controles.golpePresionado) {
+            if (sistemaAgarre.tienEnemigoAgarrado()) {
+                if (!isGrabPunching) {
+                    isGrabPunching = true;
+                    tiempoGrabPunching = 0f;
+                    stateTime = 0f;
+                    
+                    Enemigo objetivo = sistemaAgarre.getEnemigoAgarrado();
+                    if (objetivo != null) {
+                        Jugador jug = (Jugador) entJugador.getModelo();
+                        jug.atacar(objetivo);
+                        tiempoRecibeDanoGrab = 0.25f; // Show RecibeDano2 for 0.25 seconds
+                        
+                        // Si el ataque mató al enemigo, lo empujamos y soltamos
+                        if (!objetivo.estaVivo()) {
+                            float dirEmpuje = mirandoDerecha ? 5f : -5f;
+                            Body cEnemigo = sistemaAgarre.getCuerpoAgarrado();
+                            if (cEnemigo != null) {
+                                cEnemigo.setLinearVelocity(dirEmpuje, 4f);
+                            }
+                            sistemaAgarre.soltarAgarre();
+                        }
+                    }
+                }
+            } else if (!isAtacando) {
+                isAtacando     = true;
+                tiempoAtacando = 0f;
+                stateTime      = 0f;
+                float vx = entJugador.getCuerpo().getLinearVelocity().x;
 
-            Jugador jug      = (Jugador) entJugador.getModelo();
-            Enemigo objetivo = enemigoMasCercano();
-            if (objetivo != null) {
-                boolean estabaVivo = objetivo.estaVivo();
-                jug.atacar(objetivo);
-                if (estabaVivo && !objetivo.estaVivo()) {
-                    float dirEmpuje = mirandoDerecha ? 5f : -5f;
-                    Body cEnemigo = null;
-                    if (entEnemigoDebil  != null && objetivo == entEnemigoDebil.getModelo())  cEnemigo = entEnemigoDebil.getCuerpo();
-                    else if (entEnemigoFuerte != null && objetivo == entEnemigoFuerte.getModelo()) cEnemigo = entEnemigoFuerte.getCuerpo();
-                    if (cEnemigo != null) cEnemigo.setLinearVelocity(dirEmpuje, 4f);
+                Jugador jug      = (Jugador) entJugador.getModelo();
+                Enemigo objetivo = enemigoMasCercano();
+                if (objetivo != null) {
+                    boolean estabaVivo = objetivo.estaVivo();
+                    jug.atacar(objetivo);
+                    if (estabaVivo && !objetivo.estaVivo()) {
+                        float dirEmpuje = mirandoDerecha ? 5f : -5f;
+                        Body cEnemigo = null;
+                        if (entEnemigoDebil  != null && objetivo == entEnemigoDebil.getModelo())  cEnemigo = entEnemigoDebil.getCuerpo();
+                        else if (entEnemigoFuerte != null && objetivo == entEnemigoFuerte.getModelo()) cEnemigo = entEnemigoFuerte.getCuerpo();
+                        if (cEnemigo != null) cEnemigo.setLinearVelocity(dirEmpuje, 4f);
+                    }
                 }
             }
         }
@@ -441,8 +610,25 @@ public class PantallaJuego implements Screen {
         boolean lanzarAhora = controles.lanzarPresionado;
         if (lanzarAhora && !lanzarAnteriorPresionado) {
             int dir = controles.moviendoIzquierda() ? -1 : 1;
-            if (sistemaAgarre.tienEnemigoAgarrado()) sistemaAgarre.lanzarEnemigo(dir);
-            else sistemaAgarre.lanzarArma(cuerpoArma, dir, 15f);
+            if (sistemaAgarre.tienEnemigoAgarrado()) {
+                isThrowing = true;
+                tiempoThrowing = 0f;
+                stateTime = 0f;
+                Enemigo en = sistemaAgarre.getEnemigoAgarrado();
+                if (en != null) {
+                    en.setLanzado(true);
+                }
+                sistemaAgarre.lanzarEnemigo(dir);
+            } else {
+                Jugador jug = (Jugador) entJugador.getModelo();
+                if (jug.getArmaEquipada() != null && jug.getArmaEquipada() instanceof Cuchillo) {
+                    isArmaRecogida = false;
+                    sistemaAgarre.lanzarArma(cuerpoArma, dir, 15f);
+                    jug.equiparArma(null);
+                } else {
+                    System.out.println("[Lanzar] No tienes un cuchillo equipado para lanzar.");
+                }
+            }
         }
         lanzarAnteriorPresionado = lanzarAhora;
     }
@@ -483,6 +669,8 @@ public class PantallaJuego implements Screen {
         animadorHeroe.dispose();
         texturaHUDFondo.dispose();
         texturaHUDBarra.dispose();
+        if (texturaGameOver != null) texturaGameOver.dispose();
+        if (font != null) font.dispose();
         if (animadorEnemigoDebil != null) animadorEnemigoDebil.dispose();
     }
 
@@ -491,8 +679,52 @@ public class PantallaJuego implements Screen {
     private void actualizarEnemigos(float delta) {
         entJugador.getModelo().actualizar(delta);
 
+        // Detección de recoger arma si el jugador está desarmado y cerca del arma
+        Jugador jug = (Jugador) entJugador.getModelo();
+        if (!isPlayerDying && !isGameOver && !isArmaRecogida && cuerpoArma != null && jug.getArmaEquipada() == null) {
+            float dist = entJugador.getCuerpo().getPosition().dst(cuerpoArma.getPosition());
+            if (dist < 1.0f) {
+                jug.equiparArma(armaFisica);
+                isArmaRecogida = true;
+                System.out.println("[Arma] Jugador recoge " + armaFisica.getClass().getSimpleName() + " del suelo.");
+            }
+        }
+        if (!jug.estaVivo() && !isGameOver && !isPlayerDying) {
+            isPlayerDying = true;
+            tiempoMuerteJugador = 0f;
+            if (sistemaAgarre.tienEnemigoAgarrado()) {
+                sistemaAgarre.soltarAgarre();
+            }
+            isAtacando = false;
+            isGrabPunching = false;
+            isThrowing = false;
+        }
+
+        if (isPlayerDying) {
+            tiempoMuerteJugador += delta;
+            // Detener movimiento horizontal, pero permitir caída libre física
+            entJugador.getCuerpo().setLinearVelocity(0, entJugador.getCuerpo().getLinearVelocity().y);
+            
+            if (tiempoMuerteJugador >= 3.0f) {
+                isPlayerDying = false;
+                vidas--;
+                if (vidas > 0) {
+                    jug.revivir(jug.getVidaMaxima());
+                    reposicionarJugadorPorEscenario();
+                } else {
+                    isGameOver = true;
+                }
+            }
+        }
+
         if (entEnemigoDebil != null) {
             entEnemigoDebil.getModelo().actualizar(delta);
+            
+            // Si el enemigo estaba lanzado y toca el suelo, deja de estar lanzado
+            if (entEnemigoDebil.getModelo().isLanzado() && entEnemigoDebil.estaEnSuelo()) {
+                entEnemigoDebil.getModelo().setLanzado(false);
+            }
+            
             actualizarIA(delta, entEnemigoDebil);
 
             if (!entEnemigoDebil.getModelo().estaVivo()) {
@@ -503,6 +735,14 @@ public class PantallaJuego implements Screen {
                     mundo.getWorld().destroyBody(entEnemigoDebil.getCuerpo());
                     entEnemigoDebil = null;
                 }
+            }
+        }
+
+        if (entEnemigoFuerte != null) {
+            entEnemigoFuerte.getModelo().actualizar(delta);
+            // Si el enemigo fuerte estaba lanzado y toca el suelo, deja de estar lanzado
+            if (entEnemigoFuerte.getModelo().isLanzado() && entEnemigoFuerte.estaEnSuelo()) {
+                entEnemigoFuerte.getModelo().setLanzado(false);
             }
         }
     }
@@ -535,7 +775,11 @@ public class PantallaJuego implements Screen {
             enemigo.mover(Math.signum(dx) * 0.5f);
         } else {
             enemigo.detener();
-            if (entJugador.getModelo().estaVivo() && cooldownAtaqueDebil <= 0) {
+            float yJ = entJugador.getCuerpo().getPosition().y;
+            float yE = enemigo.getCuerpo().getPosition().y;
+            float dy = yJ - yE;
+
+            if (entJugador.getModelo().estaVivo() && Math.abs(dy) <= 1.0f && cooldownAtaqueDebil <= 0) {
                 isAtacandoDebil     = true;
                 tiempoAtacandoDebil = 0f;
                 stateTimeDebil      = 0f;
@@ -561,6 +805,10 @@ public class PantallaJuego implements Screen {
         TextureRegion frameActual;
         TextureRegion primerFrame;
 
+        // Escala del enemigo débil ajustada a la normalización de 193 x 250 px
+        float altoCanvasM  = 250f / MundoFisico.PPM;
+        float anchoCanvasM = 193f / MundoFisico.PPM;
+
         if (!enemigo.getModelo().estaVivo()) {
             if (tiempoEnSueloMuerto < 1.0f && !enemigo.estaEnSuelo()) {
                 frameActual = animador.animFall.getKeyFrame(stateTime, false);
@@ -568,7 +816,20 @@ public class PantallaJuego implements Screen {
             } else {
                 frameActual = animador.animDead.getKeyFrame(stateTime, false);
                 primerFrame  = animador.animDead.getKeyFrame(0f);
+                anchoCanvasM = 225f / MundoFisico.PPM; // Ancho especial del sprite de muerte (normalizado a 225x250)
             }
+        } else if (sistemaAgarre.tienEnemigoAgarrado() && sistemaAgarre.getEnemigoAgarrado() == enemigo.getModelo()) {
+            // Mientras está en agarre
+            if (tiempoRecibeDanoGrab > 0) {
+                frameActual = animador.animHurt.getKeyFrame(0.15f, false); // RecibeDano2
+            } else {
+                frameActual = animador.animHurt.getKeyFrame(0f, false);    // RecibeDano1
+            }
+            primerFrame = animador.animHurt.getKeyFrame(0f, false);
+        } else if (enemigo.getModelo().isLanzado()) {
+            // Si está lanzado, usar el sprite Caida
+            frameActual = animador.animFall.getKeyFrame(stateTime, false);
+            primerFrame  = animador.animFall.getKeyFrame(0f);
         } else if (enemigo.getModelo().tiempoHurt > 0) {
             frameActual = animador.animHurt.getKeyFrame(enemigo.getModelo().tiempoHurt, false);
             primerFrame  = animador.animHurt.getKeyFrame(0f);
@@ -582,11 +843,6 @@ public class PantallaJuego implements Screen {
             frameActual = animador.animIdle.getKeyFrame(stateTime, true);
             primerFrame  = animador.animIdle.getKeyFrame(0f);
         }
-
-        // Escala del enemigo
-
-        float altoCanvasM  = 300f / MundoFisico.PPM;
-        float anchoCanvasM = 240f / MundoFisico.PPM;
 
         float altoCuerpoFisicoM = 160f / MundoFisico.PPM;
         float dibX = enX - (anchoCanvasM / 2f);
@@ -639,7 +895,11 @@ public class PantallaJuego implements Screen {
     }
 
 
-   private void reposicionarJugadorPorEscenario() {
+    private void reposicionarJugadorPorEscenario() {
+        reposicionarJugadorPorEscenario(false);
+    }
+
+    private void reposicionarJugadorPorEscenario(boolean respawnSeguro) {
         int escenario = gestorEscenarios.getEscenarioActivo();
         Body cuerpoJugador = entJugador.getCuerpo();
 
@@ -648,24 +908,38 @@ public class PantallaJuego implements Screen {
 
         if (escenario == 0) {
             ySuelo    = SUELO_AZOTEA;
-            xJugador  = 16f;
+            if (respawnSeguro) {
+                xJugador = calcularPosicionSeguraSpawn();
+            } else if (escenarioOrigen == 1) {
+                xJugador = 16f;
+            } else {
+                xJugador = 2f;
+            }
         } else if (escenario == 1) {
             ySuelo    = SUELO_CALLE;
-            if (escenarioOrigen == 2) {
-                xJugador = 16f; 
+            if (respawnSeguro) {
+                xJugador = calcularPosicionSeguraSpawn();
             } else {
-                xJugador = 3f;
+                if (escenarioOrigen == 2) {
+                    xJugador = 16f; 
+                } else {
+                    xJugador = 3f;
+                }
             }
         } else if (escenario == 2) { 
             ySuelo    = SUELO_MUELLE;
-            if (escenarioOrigen == 3) {
-                xJugador = 16f;
+            if (respawnSeguro) {
+                xJugador = calcularPosicionSeguraSpawn();
             } else {
-                xJugador = 3f;
+                if (escenarioOrigen == 3) {
+                    xJugador = 16f;
+                } else {
+                    xJugador = 3f;
+                }
             }
         } else { 
             ySuelo    = SUELO_INDUSTRIA;
-            xJugador  = 3f;
+            xJugador  = respawnSeguro ? calcularPosicionSeguraSpawn() : 3f;
         }
 
         mundo.crearSuelo(ySuelo);
@@ -677,5 +951,107 @@ public class PantallaJuego implements Screen {
 
         camara.position.x = cuerpoJugador.getPosition().x;
         camara.update();
+    }
+
+    private float calcularPosicionSeguraSpawn() {
+        int escenario = gestorEscenarios.getEscenarioActivo();
+        float xMin = 3.0f;
+        float xMax = 16.0f;
+        
+        java.util.List<Float> enemigosX = new java.util.ArrayList<>();
+        if (entEnemigoDebil != null && entEnemigoDebil.getModelo().estaVivo()) {
+            enemigosX.add(entEnemigoDebil.getCuerpo().getPosition().x);
+        }
+        if (entEnemigoFuerte != null && entEnemigoFuerte.getModelo().estaVivo()) {
+            enemigosX.add(entEnemigoFuerte.getCuerpo().getPosition().x);
+        }
+        
+        if (enemigosX.isEmpty()) {
+            if (escenario == 0) return 16f;
+            return 3f;
+        }
+        
+        float mejorX = -1f;
+        float maxDistMinima = -1f;
+        
+        for (float x = xMin; x <= xMax; x += 0.5f) {
+            float distMinima = Float.MAX_VALUE;
+            for (float ex : enemigosX) {
+                float d = Math.abs(x - ex);
+                if (d < distMinima) {
+                    distMinima = d;
+                }
+            }
+            if (distMinima > maxDistMinima) {
+                maxDistMinima = distMinima;
+                mejorX = x;
+            }
+        }
+        
+        if (maxDistMinima < 3.0f) {
+            System.out.println("[Spawn] No hay lugar seguro (todos a menos de 3.0m). Usando posición aleatoria.");
+            return xMin + (float) Math.random() * (xMax - xMin);
+        }
+        
+        System.out.println("[Spawn] Posición segura óptima X = " + mejorX + " (distancia mínima de enemigos: " + maxDistMinima + "m).");
+        return mejorX;
+    }
+
+    private void reiniciarJuegoCompleto() {
+        vidas = 3;
+        isGameOver = false;
+        tiempoGameOver = 0f;
+        isPlayerDying = false;
+        tiempoMuerteJugador = 0f;
+        escucha.limpiarEventos();
+
+        Jugador jug = (Jugador) entJugador.getModelo();
+        jug.revivir(jug.getVidaMaxima());
+
+        if (sistemaAgarre.tienEnemigoAgarrado()) {
+            sistemaAgarre.soltarAgarre();
+        }
+        isAtacando = false;
+        isGrabPunching = false;
+        isThrowing = false;
+
+        escenarioOrigen = 0;
+        isArmaRecogida = false;
+
+        gestorEscenarios.cambiarEscenario(0); // Volver al primer escenario (azotea)
+        reposicionarJugadorPorEscenario();
+
+        reiniciarEnemigos();
+
+        // Reiniciar arma (Cuchillo en el suelo, jugador desarmado)
+        if (cuerpoArma != null) {
+            mundo.getWorld().destroyBody(cuerpoArma);
+        }
+        armaFisica = new Cuchillo();
+        jug.equiparArma(null);
+        cuerpoArma = fabrica.crearCuerpoArma(300, 80, 30, 10, armaFisica);
+    }
+
+    private void reiniciarEnemigos() {
+        // Eliminar cuerpos viejos si todavía existen
+        if (entEnemigoDebil != null) {
+            mundo.getWorld().destroyBody(entEnemigoDebil.getCuerpo());
+            entEnemigoDebil = null;
+        }
+        if (entEnemigoFuerte != null) {
+            mundo.getWorld().destroyBody(entEnemigoFuerte.getCuerpo());
+            entEnemigoFuerte = null;
+        }
+
+        // Recrear enemigo débil
+        EnemigoDebil enD = new EnemigoDebil();
+        Body cDebil = fabrica.crearCuerpoEnemigo(500, 304, 100, 160, true, enD);
+        entEnemigoDebil = new EntidadFisica(cDebil, enD);
+        tiempoEnSueloMuerto = 0f;
+
+        // Recrear enemigo fuerte
+        EnemigoFuerte enF = new EnemigoFuerte();
+        Body cFuerte = fabrica.crearCuerpoEnemigo(750, 304, 120, 180, false, enF);
+        entEnemigoFuerte = new EntidadFisica(cFuerte, enF);
     }
 }

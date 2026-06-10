@@ -22,8 +22,8 @@ public class FabricaCuerpos {
     public static final short CAT_ARMA    = 0x0008;
 
     // Máscaras: con qué categorías colisiona cada entidad
-    private static final short MASK_JUGADOR = CAT_SUELO | CAT_ENEMIGO | CAT_ARMA;
-    private static final short MASK_ENEMIGO = CAT_SUELO | CAT_JUGADOR | CAT_ENEMIGO | CAT_ARMA;
+    private static final short MASK_JUGADOR = CAT_SUELO | CAT_ARMA;
+    private static final short MASK_ENEMIGO = CAT_SUELO | CAT_ENEMIGO | CAT_ARMA;
     private static final short MASK_ARMA    = CAT_SUELO | CAT_JUGADOR | CAT_ENEMIGO;
 
     private final World world;

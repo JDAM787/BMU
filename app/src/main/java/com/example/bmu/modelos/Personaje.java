@@ -7,6 +7,7 @@ public class Personaje {
     protected boolean esAferrable; // Propiedad para saber si se puede agarrar/lanzar
 
     public float tiempoHurt = 0f;
+    protected boolean lanzado = false;
 
     public Personaje(int vidaMaxima, int dañoBase) {
         this.vidaMaxima = vidaMaxima;
@@ -53,5 +54,18 @@ public class Personaje {
 
     public boolean estaVivo() {
         return vidaActual > 0;
+    }
+
+    public void revivir(int vida) {
+        this.vidaActual = vida;
+        this.tiempoHurt = 0f;
+    }
+
+    public boolean isLanzado() {
+        return lanzado;
+    }
+
+    public void setLanzado(boolean lanzado) {
+        this.lanzado = lanzado;
     }
 }

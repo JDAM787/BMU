@@ -71,6 +71,13 @@ public class EscuchaColisiones implements ContactListener {
         cantidad = 0;
     }
 
+    public void limpiarEventos() {
+        for (int i = 0; i < cantidad; i++) {
+            cola[i] = null;
+        }
+        cantidad = 0;
+    }
+
     // ── Lógica de colisión ───────────────────────────────────────────────────
 
     private void procesarColision(Fixture fA, Fixture fB) {

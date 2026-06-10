@@ -7,9 +7,17 @@ public class Jugador extends Personaje {
         super(vidaMaxima, dañoBase);
     }
 
+    public Arma getArmaEquipada() {
+        return armaEquipada;
+    }
+
     public void equiparArma(Arma nuevaArma) {
         this.armaEquipada = nuevaArma;
-        System.out.println("Jugador equipa " + nuevaArma.getClass().getSimpleName() + ".");
+        if (nuevaArma != null) {
+            System.out.println("Jugador equipa " + nuevaArma.getClass().getSimpleName() + ".");
+        } else {
+            System.out.println("Jugador no tiene arma equipada.");
+        }
     }
 
     @Override

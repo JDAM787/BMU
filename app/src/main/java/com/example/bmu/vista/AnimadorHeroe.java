@@ -14,6 +14,11 @@ public class AnimadorHeroe {
     public Animation<TextureRegion> animJump;
     public Animation<TextureRegion> animHurt;
     public Animation<TextureRegion> animFall;
+    public Animation<TextureRegion> animGrab;
+    public Animation<TextureRegion> animGrabPunch;
+    public Animation<TextureRegion> animThrow;
+    public Animation<TextureRegion> animDeathFall;
+    public Animation<TextureRegion> animDead;
 
     // Guardaremos las texturas para poder hacer dispose al final
     private Array<Texture> texturasCargadas;
@@ -57,6 +62,23 @@ public class AnimadorHeroe {
         // Agregamos la animación de recibir daño con PlayMode.NORMAL
         animHurt = crearAnimacion(0.2f, Animation.PlayMode.NORMAL,
                 "recibeDano/dano1.png"
+        );
+
+        // Agregamos las animaciones de agarre y lanzamiento
+        animGrab = crearAnimacion(0.2f, Animation.PlayMode.NORMAL,
+                "agarre/Agarre.png"
+        );
+        animGrabPunch = crearAnimacion(0.2f, Animation.PlayMode.NORMAL,
+                "agarre/AgarreGolpe.png"
+        );
+        animThrow = crearAnimacion(0.2f, Animation.PlayMode.NORMAL,
+                "Lanzar/Lanzar.png"
+        );
+        animDeathFall = crearAnimacion(0.15f, Animation.PlayMode.NORMAL,
+                "Caida/Caida.png"
+        );
+        animDead = crearAnimacion(0.15f, Animation.PlayMode.NORMAL,
+                "muerto/Muerto.png"
         );
 
         // Pendientes por agregar:
