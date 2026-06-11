@@ -25,6 +25,9 @@ public class ControladorJugador {
     public float   tiempoThrowing      = 0f;
     public float   tiempoRecibeDanoGrab = 0f;
     public boolean isArmaRecogida      = false;
+    public boolean lanzarArmaPendiente = false;
+    public boolean intentarRecogerArma = false;
+    public int     direccionLanzamiento = 1;
 
     private boolean agarrarAnteriorPresionado = false;
     private boolean lanzarAnteriorPresionado  = false;
@@ -169,12 +172,15 @@ public class ControladorJugador {
                 sistemaAgarre.lanzarEnemigo(dir);
             } else {
                 Jugador jug = (Jugador) entJugador.getModelo();
-                if (jug.getArmaEquipada() != null && jug.getArmaEquipada() instanceof Cuchillo) {
-                    isArmaRecogida = false;
-                    sistemaAgarre.lanzarArma(cuerpoArma, dir, 15f);
-                    jug.equiparArma(null);
+                if (jug.getArmaEquipada() != null) {
+                    isThrowing           = true;
+                    tiempoThrowing       = 0f;
+                    stateTime            = 0f;
+                    lanzarArmaPendiente  = true;
+                    direccionLanzamiento = dir;
                 } else {
-                    System.out.println("[Lanzar] No tienes un cuchillo equipado para lanzar.");
+                    intentarRecogerArma = true;
+                    System.out.println("[Interact] Intento de recoger arma.");
                 }
             }
         }
@@ -238,5 +244,6 @@ public class ControladorJugador {
         isGrabPunching  = false;
         isThrowing      = false;
         isArmaRecogida  = false;
+        intentarRecogerArma = false;
     }
 }

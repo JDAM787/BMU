@@ -3,6 +3,7 @@ package com.example.bmu.modelos;
 public class Arma {
     protected int dañoAdicional;
     protected int durabilidad;
+    public float cooldownRecogida = 0f;
 
     public Arma(int dañoAdicional, int durabilidad) {
         this.dañoAdicional = dañoAdicional;

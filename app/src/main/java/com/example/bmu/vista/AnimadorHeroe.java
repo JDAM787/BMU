@@ -20,6 +20,18 @@ public class AnimadorHeroe {
     public Animation<TextureRegion> animDeathFall;
     public Animation<TextureRegion> animDead;
 
+    // Custom weapon animations
+    public Animation<TextureRegion> animWalkKnife;
+    public Animation<TextureRegion> animWalkTubo;
+    public Animation<TextureRegion> animRunKnife;
+    public Animation<TextureRegion> animRunTubo;
+    public Animation<TextureRegion> animJumpKnife;
+    public Animation<TextureRegion> animJumpTubo;
+    public Animation<TextureRegion> animIdleKnife;
+    public Animation<TextureRegion> animIdleTubo;
+    public Animation<TextureRegion> animPunchKnife;
+    public Animation<TextureRegion> animPunchTubo;
+
     // Guardaremos las texturas para poder hacer dispose al final
     private Array<Texture> texturasCargadas;
 
@@ -80,6 +92,18 @@ public class AnimadorHeroe {
         animDead = crearAnimacion(0.15f, Animation.PlayMode.NORMAL,
                 "muerto/Muerto.png"
         );
+
+        // Load new weapon animations
+        animWalkKnife = crearAnimacion(0.15f, "caminando/WalkKnife1.png", "caminando/WalkKnife2.png");
+        animWalkTubo  = crearAnimacion(0.15f, "caminando/WalkTubo1.png", "caminando/WalkTubo2.png");
+        animRunKnife  = crearAnimacion(0.12f, "corriendo/RunKnife1.png", "corriendo/RunKnife2.png", "corriendo/RunKnife3.png");
+        animRunTubo   = crearAnimacion(0.12f, "corriendo/RunTubo1.png", "corriendo/RunTubo2.png", "corriendo/RunTubo3.png");
+        animJumpKnife = crearAnimacion(0.15f, Animation.PlayMode.NORMAL, "saltando/SaltandoKnife.png");
+        animJumpTubo  = crearAnimacion(0.15f, Animation.PlayMode.NORMAL, "saltando/SaltandoTubo.png");
+        animIdleKnife  = crearAnimacion(0.15f, "quieto/QuietoKnife.png");
+        animIdleTubo   = crearAnimacion(0.15f, "quieto/QuietoTubo.png");
+        animPunchKnife = crearAnimacion(0.07f, Animation.PlayMode.NORMAL, "golpeando/GolpeKnife.png");
+        animPunchTubo  = crearAnimacion(0.07f, Animation.PlayMode.NORMAL, "golpeando/GolpeTubo.png");
 
         // Pendientes por agregar:
         // animKick = ...

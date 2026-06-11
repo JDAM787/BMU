@@ -15,7 +15,7 @@ import com.example.bmu.modelos.Personaje;
 public class EntidadFisica {
 
     private final Body    cuerpo;
-    private final Personaje modelo;
+    private final Object  modelo;
 
     // Velocidad de movimiento horizontal (m/s)
     private static final float VEL_CAMINAR = 4f;
@@ -25,7 +25,7 @@ public class EntidadFisica {
     // Umbral de velocidad vertical para considerar que está en el suelo
     private static final float UMBRAL_SUELO = 0.05f;
 
-    public EntidadFisica(Body cuerpo, Personaje modelo) {
+    public EntidadFisica(Body cuerpo, Object modelo) {
         this.cuerpo = cuerpo;
         this.modelo = modelo;
     }
@@ -92,5 +92,6 @@ public class EntidadFisica {
     }
 
     public Body    getCuerpo()  { return cuerpo;  }
-    public Personaje getModelo() { return modelo; }
+    public Personaje getModelo() { return (Personaje) modelo; }
+    public Object getModeloObjeto() { return modelo; }
 }

@@ -37,6 +37,7 @@ public class GestorEnemigos {
         float tiempoAtacando    = 0f;
         boolean isAtacando      = false;
         float tiempoEnSuelo     = 0f; // tiempo muerto en suelo (para desvanecimiento)
+        boolean yaSoltoItem     = false;
 
         EstadoEnemigo(EntidadFisica entidad) {
             this.entidad = entidad;
@@ -58,6 +59,15 @@ public class GestorEnemigos {
     private boolean atacandoJefe1  = false, atacandoJefe2  = false, atacandoJefe3  = false;
     private float   sueloMuertoJ1  = 0f, sueloMuertoJ2  = 0f, sueloMuertoJ3  = 0f;
     private boolean jefe1Activado  = false, jefe2Activado = false, jefe3Activado = false;
+    private boolean yaSoltoItemJefe1 = false, yaSoltoItemJefe2 = false, yaSoltoItemJefe3 = false;
+ 
+    public interface CallbackDropArma {
+        void onDropArma(String tipoArma, float xMetros, float yMetros);
+    }
+    private CallbackDropArma callbackDrop;
+    public void setCallbackDropArma(CallbackDropArma cb) {
+        this.callbackDrop = cb;
+    }
 
     // ── Animadores ────────────────────────────────────────────────────────────
     private final AnimadorEnemigoDebil  animadorDebil;
@@ -187,6 +197,7 @@ public class GestorEnemigos {
         cJ1.setActive(false);
         entJefe1 = new EntidadFisica(cJ1, j1);
         jefe1Activado = false; sueloMuertoJ1 = 0; stateTimeJefe1 = 0; cooldownJefe1 = 0; tiempoAtJefe1 = 0; atacandoJefe1 = false;
+        yaSoltoItemJefe1 = false;
 
         // Jefe 2
         if (entJefe2 != null) { mundo.getWorld().destroyBody(entJefe2.getCuerpo()); }
@@ -195,6 +206,7 @@ public class GestorEnemigos {
         cJ2.setActive(false);
         entJefe2 = new EntidadFisica(cJ2, j2);
         jefe2Activado = false; sueloMuertoJ2 = 0; stateTimeJefe2 = 0; cooldownJefe2 = 0; tiempoAtJefe2 = 0; atacandoJefe2 = false;
+        yaSoltoItemJefe2 = false;
 
         // Jefe 3
         if (entJefe3 != null) { mundo.getWorld().destroyBody(entJefe3.getCuerpo()); }
@@ -203,6 +215,7 @@ public class GestorEnemigos {
         cJ3.setActive(false);
         entJefe3 = new EntidadFisica(cJ3, j3);
         jefe3Activado = false; sueloMuertoJ3 = 0; stateTimeJefe3 = 0; cooldownJefe3 = 0; tiempoAtJefe3 = 0; atacandoJefe3 = false;
+        yaSoltoItemJefe3 = false;
     }
 
     // ── Posición segura de spawn para el jugador ──────────────────────────────
@@ -247,6 +260,15 @@ public class GestorEnemigos {
                 e.entidad.getModelo().setLanzado(false);
             actualizarIADebil(delta, e, entJugador, sistemaAgarre);
             if (!e.entidad.getModelo().estaVivo()) {
+                if (!e.yaSoltoItem) {
+                    e.yaSoltoItem = true;
+                    if (callbackDrop != null) {
+                        double rand = Math.random();
+                        if (rand < 0.25) {
+                            callbackDrop.onDropArma("cuchillo", e.entidad.getCuerpo().getPosition().x, e.entidad.getCuerpo().getPosition().y);
+                        }
+                    }
+                }
                 e.tiempoEnSuelo += delta;
                 if (e.tiempoEnSuelo >= 3.0f) {
                     if (sistemaAgarre.getEnemigoAgarrado() == e.entidad.getModelo())
@@ -268,6 +290,15 @@ public class GestorEnemigos {
                 e.entidad.getModelo().setLanzado(false);
             actualizarIAFuerte(delta, e, entJugador, sistemaAgarre);
             if (!e.entidad.getModelo().estaVivo()) {
+                if (!e.yaSoltoItem) {
+                    e.yaSoltoItem = true;
+                    if (callbackDrop != null) {
+                        double rand = Math.random();
+                        if (rand < 0.35) {
+                            callbackDrop.onDropArma("tubo", e.entidad.getCuerpo().getPosition().x, e.entidad.getCuerpo().getPosition().y);
+                        }
+                    }
+                }
                 e.tiempoEnSuelo += delta;
                 if (e.tiempoEnSuelo >= 3.0f) {
                     if (sistemaAgarre.getEnemigoAgarrado() == e.entidad.getModelo())
@@ -284,6 +315,12 @@ public class GestorEnemigos {
             entJefe1.getModelo().actualizar(delta);
             actualizarIAJefe(delta, entJefe1, entJugador, 1);
             if (!entJefe1.getModelo().estaVivo()) {
+                if (!yaSoltoItemJefe1) {
+                    yaSoltoItemJefe1 = true;
+                    if (callbackDrop != null) {
+                        callbackDrop.onDropArma("tubo", entJefe1.getCuerpo().getPosition().x, entJefe1.getCuerpo().getPosition().y);
+                    }
+                }
                 sueloMuertoJ1 += delta;
                 if (sueloMuertoJ1 >= 3.0f) { mundo.getWorld().destroyBody(entJefe1.getCuerpo()); entJefe1 = null; }
             }
@@ -294,6 +331,12 @@ public class GestorEnemigos {
             entJefe2.getModelo().actualizar(delta);
             actualizarIAJefe(delta, entJefe2, entJugador, 2);
             if (!entJefe2.getModelo().estaVivo()) {
+                if (!yaSoltoItemJefe2) {
+                    yaSoltoItemJefe2 = true;
+                    if (callbackDrop != null) {
+                        callbackDrop.onDropArma("tubo", entJefe2.getCuerpo().getPosition().x, entJefe2.getCuerpo().getPosition().y);
+                    }
+                }
                 sueloMuertoJ2 += delta;
                 if (sueloMuertoJ2 >= 3.0f) { mundo.getWorld().destroyBody(entJefe2.getCuerpo()); entJefe2 = null; }
             }
@@ -304,6 +347,12 @@ public class GestorEnemigos {
             entJefe3.getModelo().actualizar(delta);
             actualizarIAJefe(delta, entJefe3, entJugador, 3);
             if (!entJefe3.getModelo().estaVivo()) {
+                if (!yaSoltoItemJefe3) {
+                    yaSoltoItemJefe3 = true;
+                    if (callbackDrop != null) {
+                        callbackDrop.onDropArma("tubo", entJefe3.getCuerpo().getPosition().x, entJefe3.getCuerpo().getPosition().y);
+                    }
+                }
                 sueloMuertoJ3 += delta;
                 if (sueloMuertoJ3 >= 3.0f) { mundo.getWorld().destroyBody(entJefe3.getCuerpo()); entJefe3 = null; }
             }
@@ -490,10 +539,16 @@ public class GestorEnemigos {
         float anchoC = 240f / MundoFisico.PPM;
 
         TextureRegion frame;
+        boolean muertoEnSuelo = false;
         if (!est.entidad.getModelo().estaVivo()) {
             if (est.tiempoEnSuelo < 1.0f && !est.entidad.estaEnSuelo())
                 frame = animadorFuerte.animFall.getKeyFrame(est.stateTime, false);
-            else { frame = animadorFuerte.animDead.getKeyFrame(est.stateTime, false); anchoC = 260f / MundoFisico.PPM; }
+            else {
+                frame = animadorFuerte.animDead.getKeyFrame(est.stateTime, false);
+                anchoC = 283f / MundoFisico.PPM;
+                altoC = 116f / MundoFisico.PPM;
+                muertoEnSuelo = true;
+            }
         } else if (sistemaAgarre.tienEnemigoAgarrado() && sistemaAgarre.getEnemigoAgarrado() == est.entidad.getModelo()) {
             frame = animadorFuerte.animHurt.getKeyFrame(tiempoRecibeDanoGrab > 0 ? 0.15f : 0f, false);
         } else if (est.entidad.getModelo().isLanzado()) {
@@ -515,7 +570,11 @@ public class GestorEnemigos {
         TextureRegion drawFrame = new TextureRegion(frame);
         if (!miraDerecha) drawFrame.flip(true, false);
         float altoCuerpo = 180f / MundoFisico.PPM;
-        batch.draw(drawFrame, enX - anchoC / 2f, enY - altoCuerpo / 2f, anchoC, altoC);
+        float dibY = enY - altoCuerpo / 2f;
+        if (muertoEnSuelo) {
+            dibY = enY - 100f / MundoFisico.PPM; // Alinea los pies/cuerpo con el suelo físico al estar acostado
+        }
+        batch.draw(drawFrame, enX - anchoC / 2f, dibY, anchoC, altoC);
     }
 
     private void dibujarJefe(SpriteBatch batch, EntidadFisica entidad, EntidadFisica entJugador, int idx) {
@@ -537,16 +596,29 @@ public class GestorEnemigos {
         AnimadorJefe2 a2 = idx == 2 ? animadorJefe2 : null;
         AnimadorJefe3 a3 = idx == 3 ? animadorJefe3 : null;
 
+        boolean muertoEnSuelo = false;
         if (!entidad.getModelo().estaVivo()) {
             boolean enSuelo = entidad.estaEnSuelo();
-            if (suelo < 1.0f && !enSuelo)
+            if (suelo < 1.0f && !enSuelo) {
                 frame = (a1 != null) ? a1.animFall.getKeyFrame(stateT, false)
                       : (a2 != null) ? a2.animFall.getKeyFrame(stateT, false)
                       :                a3.animFall.getKeyFrame(stateT, false);
-            else
+            } else {
                 frame = (a1 != null) ? a1.animDead.getKeyFrame(stateT, false)
                       : (a2 != null) ? a2.animDead.getKeyFrame(stateT, false)
                       :                a3.animDead.getKeyFrame(stateT, false);
+                muertoEnSuelo = true;
+                if (idx == 1) {
+                    anchoC = 278f / MundoFisico.PPM;
+                    altoC = 240f / MundoFisico.PPM;
+                } else if (idx == 2) {
+                    anchoC = 305f / MundoFisico.PPM;
+                    altoC = 240f / MundoFisico.PPM;
+                } else {
+                    anchoC = 314f / MundoFisico.PPM;
+                    altoC = 240f / MundoFisico.PPM;
+                }
+            }
         } else if (entidad.getModelo().tiempoHurt > 0) {
             frame = (a1 != null) ? a1.animHurt.getKeyFrame(entidad.getModelo().tiempoHurt, false)
                   : (a2 != null) ? a2.animHurt.getKeyFrame(entidad.getModelo().tiempoHurt, false)
@@ -572,7 +644,11 @@ public class GestorEnemigos {
         TextureRegion drawFrame = new TextureRegion(frame);
         if (!miraDerecha) drawFrame.flip(true, false);
         float altoCuerpo = 200f / MundoFisico.PPM;
-        batch.draw(drawFrame, enX - anchoC / 2f, enY - altoCuerpo / 2f, anchoC, altoC);
+        float dibY = enY - altoCuerpo / 2f;
+        if (muertoEnSuelo) {
+            dibY = enY - altoC / 2f;
+        }
+        batch.draw(drawFrame, enX - anchoC / 2f, dibY, anchoC, altoC);
     }
 
     public boolean todosEnemigosNormalesMuertos() {

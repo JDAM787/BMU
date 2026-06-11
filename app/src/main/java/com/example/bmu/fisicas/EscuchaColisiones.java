@@ -36,6 +36,7 @@ public class EscuchaColisiones implements ContactListener {
     private static final int CAPACIDAD = 64;
     private final EventoColision[] cola  = new EventoColision[CAPACIDAD];
     private int cantidad = 0;
+    public final java.util.List<Body> cuerposADestruir = new java.util.ArrayList<>();
 
     // Daño de impacto cuando un enemigo lanzado golpea el suelo
     private static final int DAÑO_CAIDA   = 10;
@@ -55,7 +56,16 @@ public class EscuchaColisiones implements ContactListener {
     }
 
     @Override public void endContact(Contact contact) { /* no usado */ }
-    @Override public void preSolve(Contact contact, Manifold oldManifold) { }
+    @Override
+    public void preSolve(Contact contact, Manifold oldManifold) {
+        Object udA = contact.getFixtureA().getBody().getUserData();
+        Object udB = contact.getFixtureB().getBody().getUserData();
+
+        if ((udA instanceof Arma && udB instanceof Personaje) ||
+            (udB instanceof Arma && udA instanceof Personaje)) {
+            contact.setEnabled(false);
+        }
+    }
     @Override public void postSolve(Contact contact, ContactImpulse impulse) { }
 
     // ── Procesamiento seguro (fuera de world.step) ───────────────────────────
@@ -86,9 +96,9 @@ public class EscuchaColisiones implements ContactListener {
 
         // Arma → Enemigo
         if (udA instanceof Arma && udB instanceof Enemigo) {
-            manejarArmaVsEnemigo((Arma) udA, (Enemigo) udB);
+            manejarArmaVsEnemigo((Arma) udA, (Enemigo) udB, fA.getBody());
         } else if (udB instanceof Arma && udA instanceof Enemigo) {
-            manejarArmaVsEnemigo((Arma) udB, (Enemigo) udA);
+            manejarArmaVsEnemigo((Arma) udB, (Enemigo) udA, fB.getBody());
         }
 
         // Enemigo lanzado → Enemigo estático (golpe de cadena)
@@ -104,14 +114,25 @@ public class EscuchaColisiones implements ContactListener {
         }
     }
 
-    private void manejarArmaVsEnemigo(Arma arma, Enemigo enemigo) {
+    private void manejarArmaVsEnemigo(Arma arma, Enemigo enemigo, Body cuerpoArma) {
         if (arma.estaRota()) return;
+
+        // Solo inflige daño si tiene velocidad significativa (está siendo lanzada)
+        float velX = cuerpoArma.getLinearVelocity().x;
+        if (Math.abs(velX) < 2f) return;
+
         int daño = arma.getDañoAdicional();
         enemigo.recibirDaño(daño);
         arma.usarArma(); // Consume durabilidad del arma
         System.out.println("[Colisión] Arma impacta a "
                 + enemigo.getClass().getSimpleName()
                 + " → " + daño + " de daño. Arma rota: " + arma.estaRota());
+        if (arma.estaRota()) {
+            cuerposADestruir.add(cuerpoArma);
+        } else {
+            // Rebote / caída del arma al impactar
+            cuerpoArma.setLinearVelocity(velX * -0.2f, 2f);
+        }
     }
 
     private void manejarEnemigoVsEnemigo(Enemigo a, Enemigo b,

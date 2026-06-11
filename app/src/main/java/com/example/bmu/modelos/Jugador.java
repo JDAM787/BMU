@@ -28,10 +28,15 @@ public class Jugador extends Personaje {
             dañoTotal += armaEquipada.getDañoAdicional();
             System.out.println("Jugador ataca a " + objetivo.getClass().getSimpleName() + " usando " + armaEquipada.getClass().getSimpleName() + " haciendo " + dañoTotal + " de daño total.");
             armaEquipada.usarArma();
+            if (armaEquipada.estaRota()) {
+                System.out.println("¡El arma " + armaEquipada.getClass().getSimpleName() + " se ha roto!");
+                equiparArma(null);
+            }
         } else {
             System.out.println("Jugador ataca a " + objetivo.getClass().getSimpleName() + " con los puños haciendo " + dañoTotal + " de daño.");
             if (armaEquipada != null && armaEquipada.estaRota()) {
                 System.out.println("(El arma está rota y no hace daño adicional)");
+                equiparArma(null); // Just in case a broken weapon was still equipped
             }
         }
 
