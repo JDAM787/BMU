@@ -4,15 +4,6 @@ import com.badlogic.gdx.physics.box2d.*;
 
 import static com.example.bmu.fisicas.MundoFisico.aMetros;
 
-/**
- * Fábrica de cuerpos Box2D para personajes, enemigos y armas.
- *
- * Categorías de colisión (bits) para filtrar qué choca con qué:
- *   CAT_SUELO    – el suelo estático
- *   CAT_JUGADOR  – el cuerpo del jugador
- *   CAT_ENEMIGO  – cuerpos de enemigos
- *   CAT_ARMA     – armas lanzadas / volando
- */
 public class FabricaCuerpos {
 
     // ── Bits de categoría ────────────────────────────────────────────────────
@@ -23,7 +14,7 @@ public class FabricaCuerpos {
 
     // Máscaras: con qué categorías colisiona cada entidad
     private static final short MASK_JUGADOR = CAT_SUELO | CAT_ARMA;
-    private static final short MASK_ENEMIGO = CAT_SUELO | CAT_ENEMIGO | CAT_ARMA;
+    private static final short MASK_ENEMIGO = CAT_SUELO | CAT_ARMA;
     private static final short MASK_ARMA    = CAT_SUELO | CAT_JUGADOR | CAT_ENEMIGO;
 
     private final World world;
@@ -34,15 +25,6 @@ public class FabricaCuerpos {
 
     // ── Personajes ───────────────────────────────────────────────────────────
 
-    /**
-     * Crea el cuerpo Box2D del jugador.
-     *
-     * @param xPx posición inicial en píxeles
-     * @param yPx posición inicial en píxeles
-     * @param anchoPx ancho del sprite en píxeles
-     * @param altoPx  alto  del sprite en píxeles
-     * @param userData referencia al objeto Jugador (para detectar colisiones)
-     */
     public Body crearCuerpoJugador(float xPx, float yPx,
                                    float anchoPx, float altoPx,
                                    Object userData) {
@@ -50,13 +32,6 @@ public class FabricaCuerpos {
                 CAT_JUGADOR, MASK_JUGADOR, userData);
     }
 
-    /**
-     * Crea el cuerpo Box2D de un enemigo.
-     *
-     * @param aferrable si es {@code true} se genera con densidad reducida
-     *                  (más fácil de lanzar); si es {@code false} se usa
-     *                  densidad alta (enemigo pesado/inamovible).
-     */
     public Body crearCuerpoEnemigo(float xPx, float yPx,
                                    float anchoPx, float altoPx,
                                    boolean aferrable, Object userData) {
@@ -88,10 +63,6 @@ public class FabricaCuerpos {
 
     // ── Armas ────────────────────────────────────────────────────────────────
 
-    /**
-     * Crea el cuerpo de un arma lanzada (Cuchillo, TuboMetal…).
-     * Se genera como proyectil (bullet=true) para mayor precisión.
-     */
     public Body crearCuerpoArma(float xPx, float yPx,
                                 float anchoPx, float altoPx,
                                 Object userData) {

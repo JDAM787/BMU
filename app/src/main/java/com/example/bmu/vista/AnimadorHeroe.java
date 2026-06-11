@@ -85,17 +85,6 @@ public class AnimadorHeroe {
         // animKick = ...
     }
 
-    /**
-     * Carga UNA FILA del sprite sheet como animación independiente.
-     * PlayMode.NORMAL: se reproduce una sola vez y se queda en el último frame.
-     *
-     * @param ruta       ruta relativa dentro de assets/personajes/heroe/sprites-personaje/
-     * @param frameAncho ancho de cada frame en píxeles
-     * @param frameAlto  alto de cada frame en píxeles
-     * @param cols       número de columnas en el sheet
-     * @param fila       índice de la fila a leer (0 = primera)
-     * @param duracion   segundos por frame
-     */
     private Animation<TextureRegion> crearAnimacionFila(
             String ruta, int frameAncho, int frameAlto,
             int cols, int fila, float duracion) {

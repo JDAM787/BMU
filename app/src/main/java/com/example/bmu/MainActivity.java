@@ -13,6 +13,6 @@ public class MainActivity extends AndroidApplication {
         AndroidApplicationConfiguration config = new AndroidApplicationConfiguration();
         config.useImmersiveMode = true; // Oculta barra de navegación y notificaciones
 
-        initialize(new BMUGame(), config);
+        initialize(new BMUGame(null), config);
     }
 }
